@@ -11,7 +11,7 @@ Mirrors `greentechhub-core`'s phasing, one step behind so there's always somethi
 ### v0.1 — Registration shell
 Once `greentechhub-core`'s `config`/`logging`/`health`/`proxy` land.
 
-- [ ] `registration` — `register_logging`, `register_core`, `register_health` ([docs/registration.md](docs/registration.md))
+- [x] `registration` — `register_logging`, `register_core`, `register_health` ([docs/registration.md](docs/registration.md))
 
 ### v0.2 — Query, exceptions
 Once `greentechhub-core`'s `query`/`security`/`types` land.
