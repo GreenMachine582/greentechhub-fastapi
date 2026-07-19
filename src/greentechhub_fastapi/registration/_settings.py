@@ -1,7 +1,7 @@
-"""read_list_setting — tolerant, private helper for reading list-shaped settings
-(CORS_ALLOWED_ORIGINS, trusted-proxies) that live on a service's own Settings
-subclass, not on greentechhub_core.config.GTHBaseSettings itself (it only declares
-secret_key/log_level).
+"""read_list_setting / read_str_setting — tolerant, private helpers for reading
+settings (CORS_ALLOWED_ORIGINS, TRUSTED_PROXIES, AUTH_ADAPTER) that live on a
+service's own Settings subclass, not on greentechhub_core.config.GTHBaseSettings
+itself (it only declares secret_key/log_level).
 
 Accepts either a comma-separated string (the natural shape for an env-var-backed
 field, e.g. CORS_ALLOWED_ORIGINS="https://a.example,https://b.example") or an
@@ -24,3 +24,11 @@ def read_list_setting(settings: Any, name: str) -> list[str]:
     if isinstance(value, Sequence):
         return [str(item) for item in value]
     return []
+
+
+def read_str_setting(settings: Any, name: str, default: str) -> str:
+    """Read a scalar string setting, falling back to `default` when unset/falsy."""
+    value = getattr(settings, name, "")
+    if not value:
+        return default
+    return str(value)

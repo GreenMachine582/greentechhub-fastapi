@@ -2,9 +2,12 @@ import asyncio
 import logging
 
 import httpx
-from fastapi import FastAPI
+import pytest
+from fastapi import Depends, FastAPI
+from greentechhub_core.identity import DevelopmentIdentityProvider, Identity
 
-from greentechhub_fastapi import register_core, register_health, register_logging
+from greentechhub_fastapi import register_auth, register_core, register_health, register_logging
+from greentechhub_fastapi.auth import get_current_user
 from tests.conftest import build_app
 
 
@@ -53,3 +56,58 @@ def test_cors_allowed_origins_configured_allows_listed_origin(settings):
         _get(app, "/health", headers={"Origin": "https://allowed.example"})
     )
     assert response.headers["access-control-allow-origin"] == "https://allowed.example"
+
+
+def _add_whoami_route(app):
+    @app.get("/whoami")
+    async def whoami(user=Depends(get_current_user)):
+        return {"username": user.username if user else None}
+
+    return app
+
+
+async def _get_with_cookies(app, path, cookies=None):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", cookies=cookies
+    ) as client:
+        return await client.get(path)
+
+
+def test_register_auth_default_adapter_is_local(settings):
+    app = _add_whoami_route(FastAPI())
+    register_auth(app, settings)
+
+    identity = Identity(
+        subject="user-1", username="alice", email=None, groups=[], claims={}
+    )
+    provider = DevelopmentIdentityProvider(secret_key=settings.secret_key)
+    token = provider.issue(identity)
+
+    response = asyncio.run(_get_with_cookies(app, "/whoami", cookies={"gth_session": token}))
+    assert response.json() == {"username": "alice"}
+
+
+def test_register_auth_empty_auth_adapter_behaves_as_local(settings):
+    settings.AUTH_ADAPTER = ""
+    app = _add_whoami_route(FastAPI())
+    register_auth(app, settings)
+
+    response = asyncio.run(_get_with_cookies(app, "/whoami"))
+    assert response.json() == {"username": None}
+
+
+def test_register_auth_forward_auth_raises_not_implemented(settings):
+    settings.AUTH_ADAPTER = "forward_auth"
+    app = FastAPI()
+
+    with pytest.raises(NotImplementedError):
+        register_auth(app, settings)
+
+
+def test_register_auth_unknown_adapter_raises_value_error(settings):
+    settings.AUTH_ADAPTER = "oidc"
+    app = FastAPI()
+
+    with pytest.raises(ValueError):
+        register_auth(app, settings)

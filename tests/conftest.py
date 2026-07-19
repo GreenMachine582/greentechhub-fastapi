@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from greentechhub_core.config import GTHBaseSettings
 
 from greentechhub_fastapi import (
+    register_auth,
     register_core,
     register_exception_handlers,
     register_health,
@@ -15,6 +16,7 @@ from greentechhub_fastapi import (
 class _Settings(GTHBaseSettings):
     CORS_ALLOWED_ORIGINS: str = ""
     TRUSTED_PROXIES: str = ""
+    AUTH_ADAPTER: str = "local"
 
 
 @pytest.fixture
@@ -28,6 +30,7 @@ def build_app(settings, *, checks=()):
     register_logging(app, settings)
     register_core(app, settings)
     register_health(app, checks=checks)
+    register_auth(app, settings)
     register_exception_handlers(app)
     return app
 

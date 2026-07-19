@@ -22,8 +22,8 @@ Once `greentechhub-core`'s `query`/`security`/`types` land.
 ### v0.3 — Auth, dependencies
 Once `greentechhub-core`'s `identity`/`permissions` land.
 
-- [ ] `auth` — `local` adapter ([docs/auth.md](docs/auth.md))
-- [ ] `dependencies` ([docs/modules.md](docs/modules.md#dependencies))
+- [x] `auth` — `local` adapter ([docs/auth.md](docs/auth.md))
+- [x] `dependencies` ([docs/modules.md](docs/modules.md#dependencies))
 
 ### v0.4 — Flash, events
 Once `greentechhub-core`'s `events`/`feature_flags` land.
