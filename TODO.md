@@ -16,8 +16,8 @@ Once `greentechhub-core`'s `config`/`logging`/`health`/`proxy` land.
 ### v0.2 — Query, exceptions
 Once `greentechhub-core`'s `query`/`security`/`types` land.
 
-- [ ] `query` — `PageParams` adapter ([docs/query.md](docs/query.md))
-- [ ] `exception_handlers` ([docs/exceptions.md](docs/exceptions.md))
+- [x] `query` — `PageParams` adapter ([docs/query.md](docs/query.md))
+- [x] `exception_handlers` ([docs/exceptions.md](docs/exceptions.md))
 
 ### v0.3 — Auth, dependencies
 Once `greentechhub-core`'s `identity`/`permissions` land.

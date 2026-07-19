@@ -4,7 +4,12 @@ import pytest
 from fastapi import FastAPI
 from greentechhub_core.config import GTHBaseSettings
 
-from greentechhub_fastapi import register_core, register_health, register_logging
+from greentechhub_fastapi import (
+    register_core,
+    register_exception_handlers,
+    register_health,
+    register_logging,
+)
 
 
 class _Settings(GTHBaseSettings):
@@ -23,6 +28,7 @@ def build_app(settings, *, checks=()):
     register_logging(app, settings)
     register_core(app, settings)
     register_health(app, checks=checks)
+    register_exception_handlers(app)
     return app
 
 
