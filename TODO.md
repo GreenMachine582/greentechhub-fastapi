@@ -29,7 +29,10 @@ Once `greentechhub-core`'s `identity`/`permissions` land.
 Once `greentechhub-core`'s `events`/`feature_flags` land.
 
 - [ ] `flash` ([docs/modules.md](docs/modules.md#flash-and-events))
-- [ ] `events` integration ([docs/modules.md](docs/modules.md#flash-and-events))
+- [ ] `events` integration ([docs/modules.md](docs/modules.md#flash-and-events)) — open decision: core's
+      `publish()`/`EventBus` need no setup/teardown, so should `register_events(app)` be (a) a DI-only
+      `Depends(get_event_publisher)` for route handlers, (b) FastAPI lifespan hooks that publish
+      caller-supplied startup/shutdown `Event`s, or (c) both? Needs a decision before implementation.
 
 ### v0.5 — Authentik-backed auth
 - [ ] `auth`'s `forward_auth` path, once an Authentik instance exists to test against ([docs/auth.md](docs/auth.md))
