@@ -34,7 +34,10 @@ Once `greentechhub-core`'s `events`/`feature_flags` land.
       is the future home of the Redis backend's connect/disconnect.
 
 ### v0.5 — Authentik-backed auth
-- [ ] `auth`'s `forward_auth` path, once an Authentik instance exists to test against ([docs/auth.md](docs/auth.md))
+- [x] `auth`'s `forward_auth` path ([docs/auth.md](docs/auth.md)) — shipped 2026-09-12:
+      `AuthentikIdentityProvider()` wired via `register_auth`; `ProxyHeadersMiddleware`
+      sets `request.state.trusted_proxy` from the request's real remote_addr as the
+      one trust signal `forward_auth`'s `get_current_user` reads.
 
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it
