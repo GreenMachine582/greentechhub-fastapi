@@ -10,6 +10,7 @@ async def _echo_app(scope, receive, send):
             "client": scope["client"],
             "scheme": scope["scheme"],
             "headers": {k.decode(): v.decode() for k, v in scope["headers"]},
+            "state": scope.get("state"),
         }
     ).encode()
     await send({"type": "http.response.start", "status": 200, "headers": []})
@@ -73,3 +74,24 @@ def test_no_trusted_proxies_configured_is_a_no_op():
     result = asyncio.run(_run(app, scope))
     assert result["client"] == ["10.0.0.1", 12345]
     assert result["scheme"] == "http"
+
+
+def test_trusted_remote_addr_sets_trusted_proxy_state_true():
+    app = ProxyHeadersMiddleware(_echo_app, trusted_proxies=["10.0.0.1"])
+    scope = _make_scope(client=("10.0.0.1", 12345))
+    result = asyncio.run(_run(app, scope))
+    assert result["state"] == {"trusted_proxy": True}
+
+
+def test_untrusted_remote_addr_sets_trusted_proxy_state_false():
+    app = ProxyHeadersMiddleware(_echo_app, trusted_proxies=["10.0.0.1"])
+    scope = _make_scope(client=("203.0.113.5", 12345))
+    result = asyncio.run(_run(app, scope))
+    assert result["state"] == {"trusted_proxy": False}
+
+
+def test_no_trusted_proxies_configured_still_sets_trusted_proxy_state_false():
+    app = ProxyHeadersMiddleware(_echo_app, trusted_proxies=())
+    scope = _make_scope(client=("10.0.0.1", 12345))
+    result = asyncio.run(_run(app, scope))
+    assert result["state"] == {"trusted_proxy": False}
