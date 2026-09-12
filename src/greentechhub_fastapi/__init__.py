@@ -21,9 +21,9 @@ deliberately not re-exported here: they're per-route Depends() dependencies
 or route-local helpers, not one-time app-level registration calls, and each
 module's own doc sample imports them directly from their own module.
 
-register_auth only implements the "local" adapter (docs/auth.md) — selecting
-AUTH_ADAPTER="forward_auth" raises NotImplementedError until v0.5, once a real
-Authentik instance exists to test against.
+register_auth implements both the "local" and "forward_auth" adapters
+(docs/auth.md) as of v0.5 — AUTH_ADAPTER selects between them as a config
+change, not a code change.
 
 register_flash / register_events (v0.4) join the other register_* functions
 here for the same reason: each is a one-time app-level registration call. The

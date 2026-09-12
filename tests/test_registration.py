@@ -11,8 +11,8 @@ from greentechhub_fastapi.auth import get_current_user
 from tests.conftest import build_app
 
 
-async def _get(app, path, headers=None):
-    transport = httpx.ASGITransport(app=app)
+async def _get(app, path, headers=None, client_addr=("127.0.0.1", 123)):
+    transport = httpx.ASGITransport(app=app, client=client_addr)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         return await client.get(path, headers=headers)
 
@@ -97,12 +97,57 @@ def test_register_auth_empty_auth_adapter_behaves_as_local(settings):
     assert response.json() == {"username": None}
 
 
-def test_register_auth_forward_auth_raises_not_implemented(settings):
+def test_register_auth_forward_auth_trusted_proxy_resolves_identity(settings):
     settings.AUTH_ADAPTER = "forward_auth"
-    app = FastAPI()
+    settings.TRUSTED_PROXIES = "10.0.0.1"
+    app = _add_whoami_route(FastAPI())
+    register_core(app, settings)
+    register_auth(app, settings)
 
-    with pytest.raises(NotImplementedError):
-        register_auth(app, settings)
+    response = asyncio.run(
+        _get(
+            app,
+            "/whoami",
+            headers={"X-authentik-username": "alice"},
+            client_addr=("10.0.0.1", 12345),
+        )
+    )
+    assert response.json() == {"username": "alice"}
+
+
+def test_register_auth_forward_auth_untrusted_remote_addr_resolves_none(settings):
+    settings.AUTH_ADAPTER = "forward_auth"
+    settings.TRUSTED_PROXIES = "10.0.0.1"
+    app = _add_whoami_route(FastAPI())
+    register_core(app, settings)
+    register_auth(app, settings)
+
+    response = asyncio.run(
+        _get(
+            app,
+            "/whoami",
+            headers={"X-authentik-username": "alice"},
+            client_addr=("203.0.113.5", 12345),
+        )
+    )
+    assert response.json() == {"username": None}
+
+
+def test_register_auth_forward_auth_without_register_core_fails_closed(settings):
+    settings.AUTH_ADAPTER = "forward_auth"
+    settings.TRUSTED_PROXIES = "10.0.0.1"
+    app = _add_whoami_route(FastAPI())
+    register_auth(app, settings)
+
+    response = asyncio.run(
+        _get(
+            app,
+            "/whoami",
+            headers={"X-authentik-username": "alice"},
+            client_addr=("10.0.0.1", 12345),
+        )
+    )
+    assert response.json() == {"username": None}
 
 
 def test_register_auth_unknown_adapter_raises_value_error(settings):
