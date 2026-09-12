@@ -24,12 +24,21 @@ module's own doc sample imports them directly from their own module.
 register_auth only implements the "local" adapter (docs/auth.md) — selecting
 AUTH_ADAPTER="forward_auth" raises NotImplementedError until v0.5, once a real
 Authentik instance exists to test against.
+
+register_flash / register_events (v0.4) join the other register_* functions
+here for the same reason: each is a one-time app-level registration call. The
+functions they enable at each request — flash()/get_flashes() (flash.py),
+get_event_publisher() (events.py) — stay un-re-exported, same as
+get_current_user/get_current_identity, since they're per-route Depends()
+dependencies, not registration calls.
 """
 
 from greentechhub_fastapi.exceptions import register_exception_handlers
 from greentechhub_fastapi.registration import (
     register_auth,
     register_core,
+    register_events,
+    register_flash,
     register_health,
     register_logging,
 )
@@ -37,7 +46,9 @@ from greentechhub_fastapi.registration import (
 __all__ = [
     "register_auth",
     "register_core",
+    "register_events",
     "register_exception_handlers",
+    "register_flash",
     "register_health",
     "register_logging",
 ]
