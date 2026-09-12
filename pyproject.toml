@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "fastapi-pagination>=0.15",
+    "itsdangerous>=2.1",
     "greentechhub-core @ git+https://github.com/GreenMachine582/greentechhub-core.git@25333a3",
 ]
 
