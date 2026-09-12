@@ -28,11 +28,10 @@ Once `greentechhub-core`'s `identity`/`permissions` land.
 ### v0.4 — Flash, events
 Once `greentechhub-core`'s `events`/`feature_flags` land.
 
-- [ ] `flash` ([docs/modules.md](docs/modules.md#flash-and-events))
-- [ ] `events` integration ([docs/modules.md](docs/modules.md#flash-and-events)) — open decision: core's
-      `publish()`/`EventBus` need no setup/teardown, so should `register_events(app)` be (a) a DI-only
-      `Depends(get_event_publisher)` for route handlers, (b) FastAPI lifespan hooks that publish
-      caller-supplied startup/shutdown `Event`s, or (c) both? Needs a decision before implementation.
+- [x] `flash` ([docs/modules.md](docs/modules.md#flash-and-events))
+- [x] `events` integration ([docs/modules.md](docs/modules.md#flash-and-events)) — decided 2026-09:
+      `register_events(app, on_startup=…, on_shutdown=…)` + `Depends(get_event_publisher)` — lifespan
+      is the future home of the Redis backend's connect/disconnect.
 
 ### v0.5 — Authentik-backed auth
 - [ ] `auth`'s `forward_auth` path, once an Authentik instance exists to test against ([docs/auth.md](docs/auth.md))

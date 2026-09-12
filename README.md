@@ -1,7 +1,7 @@
 # ⚡ greentechhub-fastapi
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?logo=opensourceinitiative&logoColor=white)](LICENSE)
-[![Status: Planning](https://img.shields.io/badge/Status-Planning-yellow.svg)](TODO.md)
+[![Status: Active Development](https://img.shields.io/badge/Status-Active%20Development-brightgreen.svg)](TODO.md)
 [![Python](https://img.shields.io/badge/Python-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![pytest](https://img.shields.io/badge/pytest-0A9EDC.svg?logo=pytest&logoColor=white)](https://docs.pytest.org/)
@@ -39,7 +39,7 @@ The FastAPI/Starlette-specific adapter package: turns `greentechhub-core`'s fram
 
 ## 🗺️ Status & Roadmap
 
-This package is in the **planning phase** — no code has shipped yet. The phased rollout (v0.1 → v1.0) and per-service migration tracking are a living checklist in [TODO.md](TODO.md).
+v0.1 through v0.4 have shipped — registration, middleware, query/exceptions, local auth, and flash/events are all built and tested. Only v0.5 (`forward_auth`, blocked on a real Authentik instance) and v1.0 (production validation) remain. The phased rollout and per-service migration tracking are a living checklist in [TODO.md](TODO.md).
 
 ## 📄 Licence
 
