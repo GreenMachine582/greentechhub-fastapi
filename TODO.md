@@ -48,7 +48,9 @@ Once `greentechhub-core`'s `events`/`feature_flags` land.
 Per-service retrofit progress.
 
 ### BottleBot
-- [ ] Swap hand-rolled `/health` for `register_health`
+- [x] Swap hand-rolled `/health` for `register_health` — done 2026-09-22; see BottleBot's own
+      `TODO.md` for the `/activity` rename this required (BottleBot's old `/health` was a human
+      dashboard, not a liveness check, and `register_health`'s paths aren't configurable)
 - [ ] Swap ad-hoc pagination for the `query` adapter
 - [ ] Adopt `register_auth`, if/when BottleBot grows a login (lowest priority)
 
