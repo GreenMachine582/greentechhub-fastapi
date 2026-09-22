@@ -39,6 +39,17 @@ Once `greentechhub-core`'s `events`/`feature_flags` land.
       sets `request.state.trusted_proxy` from the request's real remote_addr as the
       one trust signal `forward_auth`'s `get_current_user` reads.
 
+### v0.6 — Login/logout view scaffolding
+- [x] `auth.LoginViews` ([docs/auth.md](docs/auth.md)) — extracted from PyFinBot's first
+      web UI pass rather than planned upfront: PyFinBot hand-wrote the full local-auth
+      login/logout flow (render form, check credentials, issue session JWT, set/clear
+      cookie, redirect) and only the credential check was actually service-specific.
+      `LoginViews` is an ABC a service subclasses, implementing just
+      `authenticate(user_id, password) -> Identity | None` — deliberately
+      session/ORM-agnostic, so a subclass fetches its own DB session rather than this
+      class taking an opinion on how. Added `jinja2`/`python-multipart` as real
+      dependencies (previously only pulled in transitively by consumers).
+
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it
 - [ ] PyFinBot's greenfield build fully on it

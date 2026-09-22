@@ -1,12 +1,14 @@
 [project]
 name = "greentechhub-fastapi"
-version = "0.5.0"
+version = "0.6.0"
 description = "FastAPI/Starlette adapter package: turns greentechhub-core's framework-independent contracts into middleware, dependencies, and routers for the GreenTechHub ecosystem"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "fastapi-pagination>=0.15",
     "itsdangerous>=2.1",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
     "greentechhub-core @ git+https://github.com/GreenMachine582/greentechhub-core.git@v0.6.0",
 ]
 
