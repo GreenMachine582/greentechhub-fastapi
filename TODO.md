@@ -51,7 +51,11 @@ Per-service retrofit progress.
 - [x] Swap hand-rolled `/health` for `register_health` — done 2026-09-22; see BottleBot's own
       `TODO.md` for the `/activity` rename this required (BottleBot's old `/health` was a human
       dashboard, not a liveness check, and `register_health`'s paths aren't configurable)
-- [ ] Swap ad-hoc pagination for the `query` adapter
+- [x] Swap ad-hoc pagination for the `query` adapter — done 2026-09-22, this adapter's first real
+      consumer anywhere; see BottleBot's own `TODO.md` for what it took (only `page`/`size` was
+      adoptable — `sort`/`filter` don't apply to data grouped in Python — and BottleBot had to
+      write its own `Page` → `next_url` glue for `gth_pagination`, since no such helper exists
+      here or in `greentechhub-core`)
 - [ ] Adopt `register_auth`, if/when BottleBot grows a login (lowest priority)
 
 ### PyFinBot
