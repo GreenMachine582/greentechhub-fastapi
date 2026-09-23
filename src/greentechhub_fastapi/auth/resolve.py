@@ -24,17 +24,14 @@ function, which is what a service's own get_session typically already is.
 
 from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from contextlib import aclosing, asynccontextmanager
-from typing import TypeVar
 
 from fastapi import FastAPI
 
-_T = TypeVar("_T")
-
 
 @asynccontextmanager
-async def resolve_dependency(
-    app: FastAPI, dependency: Callable[[], AsyncGenerator[_T, None]]
-) -> AsyncIterator[_T]:
+async def resolve_dependency[T](
+    app: FastAPI, dependency: Callable[[], AsyncGenerator[T, None]]
+) -> AsyncIterator[T]:
     """Yield whatever `dependency` (or its override on `app`, if any) yields.
 
     `dependency` must be a zero-argument async-generator function. Cleanup

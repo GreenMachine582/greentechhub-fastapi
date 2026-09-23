@@ -71,7 +71,9 @@ class LoginViews(ABC):
     #: this class's own mount path for the two /login routes.
     login_url: str = "/login"
 
-    def __init__(self, *, templates: Jinja2Templates, identity_provider: DevelopmentIdentityProvider):
+    def __init__(
+        self, *, templates: Jinja2Templates, identity_provider: DevelopmentIdentityProvider
+    ):
         self._templates = templates
         self._identity_provider = identity_provider
 

@@ -9,12 +9,17 @@ from jinja2 import DictLoader, Environment
 from greentechhub_fastapi.auth.views import LoginViews
 
 _USERS = {
-    "alice": ("s3cret", Identity(subject="user-1", username="alice", email=None, groups=[], claims={})),
+    "alice": (
+        "s3cret",
+        Identity(subject="user-1", username="alice", email=None, groups=[], claims={}),
+    ),
 }
 
 
 def _make_templates() -> Jinja2Templates:
-    env = Environment(loader=DictLoader({"login.html": "Log in{% if error %} - {{ error }}{% endif %}"}))
+    env = Environment(
+        loader=DictLoader({"login.html": "Log in{% if error %} - {{ error }}{% endif %}"})
+    )
     return Jinja2Templates(env=env)
 
 
