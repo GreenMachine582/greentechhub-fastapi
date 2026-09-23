@@ -58,3 +58,20 @@ app.include_router(router)
 ```
 
 `LoginViews` owns rendering `login_template` (a template name resolved against the `Jinja2Templates` instance you pass in — the service supplies the actual file), minting the session JWT via the `identity_provider` you construct and pass in, and setting/clearing the cookie. Note it's the caller's job to build that provider — same precedent as `register_auth(app, settings)` reading `AUTH_ADAPTER` and choosing/constructing the right one itself, rather than a shared class hardcoding `DevelopmentIdentityProvider` internally. It deliberately never touches a database or session itself either — `authenticate()` is a plain async method, not a route parameter, so it never goes through `Depends()`. That's what `resolve_dependency(app, dependency)` (`greentechhub_fastapi.auth.resolve_dependency`) is for: it calls an async-generator-shaped dependency (e.g. a service's own `get_session`) the way FastAPI would, honoring whatever's in `app.dependency_overrides` — so a subclass's `authenticate()` still gets a test DB substituted in tests, the same as any `Depends(get_session)` route already does — without a subclass having to hand-roll that lookup itself. `login_template`/`redirect_url`/`login_url` are overridable class attributes for services whose routes/branding don't match the defaults.
+
+## Requiring a login on page routes
+
+`get_current_user` resolves to `None` for anonymous callers, and `dependencies.get_current_identity` turns that into a 401 JSON envelope — right for APIs, wrong for browser pages. For server-rendered routes use `dependencies.require_page_identity(login_url="/login")`:
+
+```python
+from greentechhub_fastapi.dependencies import require_page_identity
+
+page_identity = require_page_identity()          # login_url defaults to LoginViews.login_url
+router = APIRouter(prefix="/stocks", dependencies=[Depends(page_identity)])
+
+@router.get("/transactions")
+async def transactions(identity: Identity = Depends(page_identity)): ...
+```
+
+- Normal request, not logged in → `303` to `login_url`.
+- HTMX request (`HX-Request` header), not logged in → `401` with `HX-Redirect: login_url`. A 303 would be followed silently by the XHR and the login page swapped into whatever fragment was targeted; `HX-Redirect` makes HTMX navigate the whole page instead.

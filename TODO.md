@@ -50,6 +50,15 @@ Once `greentechhub-core`'s `events`/`feature_flags` land.
       class taking an opinion on how. Added `jinja2`/`python-multipart` as real
       dependencies (previously only pulled in transitively by consumers).
 
+### v0.7 — Page-route helpers
+- [x] `dependencies.require_page_identity(login_url)` ([docs/auth.md](docs/auth.md)) — the
+      browser-page counterpart to `get_current_identity`: 303 to the login page, or
+      `401` + `HX-Redirect` for HTMX requests (a 303 would be swapped into the fragment).
+      Extracted from PyFinBot's Stocks/Transactions pages.
+- [x] `query.page_params(default_size)` + `query.next_page_url(path, page, filters)`
+      ([docs/query.md](docs/query.md)) — the "load more" glue both BottleBot
+      (`_watchlist_page_params`/`_next_url`) and PyFinBot hand-wrote.
+
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it
 - [ ] PyFinBot's greenfield build fully on it
@@ -68,6 +77,7 @@ Per-service retrofit progress.
       write its own `Page` → `next_url` glue for `gth_pagination`, since no such helper exists
       here or in `greentechhub-core`)
 - [ ] Adopt `register_auth`, if/when BottleBot grows a login (lowest priority)
+- [ ] Replace watchlist's `_watchlist_page_params`/`_next_url` with `query.page_params`/`query.next_page_url` (v0.7)
 
 ### PyFinBot
 - [ ] Register everything from `greentechhub-fastapi` from the start (greenfield)

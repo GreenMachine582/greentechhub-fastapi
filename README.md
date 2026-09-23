@@ -30,7 +30,7 @@ The FastAPI/Starlette-specific adapter package: turns `greentechhub-core`'s fram
 |---|---|
 | [docs/registration.md](docs/registration.md) | 🔌 The one-call `register_*` service-registration pattern (read this first) |
 | [docs/auth.md](docs/auth.md) | 🔐 The `local`/`forward_auth` `IdentityProvider` adapters |
-| [docs/query.md](docs/query.md) | 🔍 `PageParams` and the `fastapi-pagination` boundary |
+| [docs/query.md](docs/query.md) | 🔍 `PageParams`, the `fastapi-pagination` boundary, and `page_params`/`next_page_url` for load-more pages |
 | [docs/health.md](docs/health.md) | 🩺 The `/health` router |
 | [docs/exceptions.md](docs/exceptions.md) | ⚠️ `ApplicationError` → HTTP response translation |
 | [docs/modules.md](docs/modules.md) | 🧩 Middleware, flash, events, dependencies |
