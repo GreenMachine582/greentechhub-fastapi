@@ -32,7 +32,7 @@ docs/z ─┘                                                                   
 2. release-please opens or updates **`chore(main): release X.Y.Z`** on `main`: the version bump
    (`pyproject.toml`) and the new `CHANGELOG.md` section, computed from the commits — `feat` → minor, `fix` →
    patch; while below 1.0 a breaking change bumps the minor.
-3. Review the notes, merge it. That tags `vX.Y.Z`, publishes the [GitHub Release](../../releases) with the same
+3. Review the notes, merge it (it's opened by the `gth-release-bot` GitHub App, so CI runs on it). That tags `vX.Y.Z`, publishes the [GitHub Release](../../releases) with the same
    notes, and merges `main` back into `dev`.
 
 Never bump versions or edit released `CHANGELOG.md` sections by hand, and never move a `v*` tag (the tag ruleset
@@ -42,5 +42,5 @@ blocks it).
 
 Repository rulesets (source of truth: [`.github/rulesets/`](.github/rulesets/), applied with
 `scripts/apply-rulesets.sh`): `main` and `dev` need a PR and green checks, no force-push or deletion; `v*` tags
-can't be moved or deleted. The admin can bypass in an emergency — every bypass is logged, so use it for fixing a
+can't be moved or deleted, and only release-please (the `gth-release-bot` app) creates them. The admin can bypass in an emergency — every bypass is logged, so use it for fixing a
 broken pipeline, not for skipping one.
