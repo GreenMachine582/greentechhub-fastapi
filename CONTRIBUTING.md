@@ -30,8 +30,9 @@ docs/z ─┘                                                                   
 
 1. Open a PR `dev` → `main` ("release: …"), wait for CI, merge (merge commit).
 2. release-please opens or updates **`chore(main): release X.Y.Z`** on `main`: the version bump
-   (`pyproject.toml`) and the new `CHANGELOG.md` section, computed from the commits — `feat` → minor, `fix` →
-   patch; while below 1.0 a breaking change bumps the minor.
+   (`pyproject.toml`) and the new `CHANGELOG.md` section, computed from the commits — `feat` → minor, `fix` /
+   `perf` / `build` → patch (docs, refactor, tests, CI and chores alone never cut a release); while below 1.0
+   a breaking change bumps the minor.
 3. Review the notes, merge it (it's opened by the `gth-release-bot` GitHub App, so CI runs on it). That tags `vX.Y.Z`, publishes the [GitHub Release](../../releases) with the same
    notes, and merges `main` back into `dev`.
 
