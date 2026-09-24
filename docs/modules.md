@@ -59,3 +59,30 @@ registration order.
 ## Dependencies
 
 Small `Depends`-ready helpers beyond auth (current identity, feature-flag lookups, pagination params) — grows only when a real service needs a new helper, not scoped up front, matching `greentechhub-core`'s own bias against dumping-ground modules.
+
+## greentechhub-ui glue (v0.8)
+
+The FastAPI half of greentechhub-ui's framework-neutral setup helpers (its `docs/contract.md`, "Setup"). This
+package still doesn't depend on greentechhub-ui — header values and directories are passed in.
+
+```python
+from greentechhub_fastapi.htmx import hx_response
+from greentechhub_fastapi.templating import mount_static_dirs, ui_context
+
+templates = Jinja2Templates(directory="templates", context_processors=[ui_context])
+greentechhub_ui.install(templates.env, service_name="PyFinBot", nav_items=[...])
+mount_static_dirs(app, greentechhub_ui.static_dirs())
+
+@router.post("/stocks/{id}/sync")
+async def sync(id: int):
+    ...
+    return hx_response(greentechhub_ui.toast("Synced", events=["closeModal", "stocksChanged"]))
+```
+
+- `ui_context(request)` — a `Jinja2Templates` context processor adding `current_path` (what gth-ui's sidebar/navbar
+  mark active and `nav_breadcrumbs` resolves). Starlette applies context processors after a route's own context,
+  so this value wins.
+- `mount_static_dirs(app, {prefix: directory})` — one `StaticFiles` mount per entry, named after the prefix.
+- `hx_response(trigger, *, status_code=204, content="", headers=None)` — a response whose `HX-Trigger` is
+  `trigger` (a string, e.g. `greentechhub_ui.toast(...)` / `greentechhub_ui.htmx.trigger(...)`, or a mapping,
+  JSON-encoded). Bodyless 204 by default; `status_code=200` + `content` to swap something in too.

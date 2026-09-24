@@ -59,6 +59,15 @@ Once `greentechhub-core`'s `events`/`feature_flags` land.
       ([docs/query.md](docs/query.md)) — the "load more" glue both BottleBot
       (`_watchlist_page_params`/`_next_url`) and PyFinBot hand-wrote.
 
+### v0.8 — greentechhub-ui glue
+- [x] `htmx.hx_response(trigger)` ([docs/modules.md](docs/modules.md#greentechhub-ui-glue-v08)) — the bodyless
+      204 carrying `HX-Trigger` that BottleBot's routes, PyFinBot's `web/htmx.py` and gth-ui's playground each
+      hand-built. Takes the header value (e.g. `greentechhub_ui.toast(...)`), so no dependency on gth-ui.
+- [x] `templating.ui_context` — a `Jinja2Templates` context processor supplying `current_path`. Neither
+      BottleBot nor PyFinBot passed it, so their navbars never marked the active page.
+- [x] `templating.mount_static_dirs(app, greentechhub_ui.static_dirs())` — the two gth-ui mounts every consumer
+      hand-wrote.
+
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it
 - [ ] PyFinBot's greenfield build fully on it
