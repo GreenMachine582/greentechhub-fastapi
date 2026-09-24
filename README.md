@@ -39,7 +39,7 @@ The FastAPI/Starlette-specific adapter package: turns `greentechhub-core`'s fram
 
 ## 🗺️ Status & Roadmap
 
-v0.1 through v0.4 have shipped — registration, middleware, query/exceptions, local auth, and flash/events are all built and tested. Only v0.5 (`forward_auth`, blocked on a real Authentik instance) and v1.0 (production validation) remain. The phased rollout and per-service migration tracking are a living checklist in [TODO.md](TODO.md).
+Shipped versions and their notes: [CHANGELOG.md](CHANGELOG.md) and the [Releases page](https://github.com/GreenMachine582/greentechhub-fastapi/releases) (both written by release-please from conventional commits). Open work: [TODO.md](TODO.md). Branches, PRs and how a release is cut: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 📄 Licence
 
