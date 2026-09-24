@@ -1,0 +1,45 @@
+# Keeps a release PR open on main (version bump + CHANGELOG.md from the
+# conventional commits since the last release); merging it tags vX.Y.Z and
+# publishes the GitHub Release. Then main is merged back into dev so dev
+# carries the new version and changelog. See CONTRIBUTING.md.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          # A PAT lets the release PR trigger CI (PRs opened with GITHUB_TOKEN
+          # don't); without it, merge the release PR via the admin bypass.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  back-merge:
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+      - name: Merge main into dev
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit origin/main
+          git push origin dev
