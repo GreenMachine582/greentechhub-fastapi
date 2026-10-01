@@ -4,6 +4,7 @@ from greentechhub_fastapi.registration.events import register_events
 from greentechhub_fastapi.registration.flash import register_flash
 from greentechhub_fastapi.registration.health import register_health
 from greentechhub_fastapi.registration.logging import register_logging
+from greentechhub_fastapi.registration.permissions import register_permissions
 
 __all__ = [
     "register_auth",
@@ -12,4 +13,5 @@ __all__ = [
     "register_flash",
     "register_health",
     "register_logging",
+    "register_permissions",
 ]

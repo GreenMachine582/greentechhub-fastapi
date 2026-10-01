@@ -9,7 +9,7 @@ dependencies = [
     "itsdangerous>=2.1",
     "jinja2>=3.1",
     "python-multipart>=0.0.9",
-    "greentechhub-core @ git+https://github.com/GreenMachine582/greentechhub-core.git@v0.6.0",
+    "greentechhub-core @ git+https://github.com/GreenMachine582/greentechhub-core.git@5dbe96774202d7f4b5b687e47c2f9355bdcd20df",
 ]
 
 [project.optional-dependencies]

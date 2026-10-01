@@ -9,19 +9,13 @@
 ## 🗺️ Milestones
 
 ### Settings & permissions
-Thin wiring over `greentechhub-core`'s planned settings and role resolution (design:
+Thin wiring over `greentechhub-core`'s settings and role resolution (design:
 [core docs/settings.md](https://github.com/GreenMachine582/greentechhub-core/blob/dev/docs/settings.md)). Every item
 is opt-in: nothing runs until the service calls the `register_*` function or mounts the views. Everything works with
 `AUTH_ADAPTER=local`, with no Authentik needed. Each PR updates any doc it would otherwise contradict. The numbers are
-the cross-repo order: core #1–#4 come first.
-- [ ] **#5 `feat(permissions): register_permissions and require_permission`**
-  - `register_permissions(app, settings, *, resolver=None)` builds a default resolver from the optional
-    `ROLE_GROUPS` and `ROLE_BOOTSTRAP` settings.
-  - `get_granted_permissions` dependency.
-  - `require_permission(p)` (JSON 403) and `require_page_permission(p)`.
-  - A `local`-adapter test: the bootstrap subject is allowed, a normal user gets 403.
-  - Docs: replace the "RBAC deferred" docstring in `dependencies/identity.py`, plus the README and
-    `docs/registration.md` rows.
+the cross-repo order: core #1–#4 and fastapi #5 (`register_permissions`) have shipped.
+- [ ] **Pin `greentechhub-core` to its next release tag.** #5 pins the core `dev` commit carrying `RoleResolver`
+  (core #1–#4 aren't tagged yet); swap the SHA for the tag once core cuts that release.
 - [ ] **#9 `feat(settings): register_settings and SettingsViews`**
   - `register_settings(app, settings, *, registry, store, manage_permission=None)`.
   - `get_settings_service`/`get_effective_settings` dependencies.
