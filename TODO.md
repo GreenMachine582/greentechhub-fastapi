@@ -8,6 +8,10 @@
 
 ## 🗺️ Milestones
 
+### Settings & permissions
+All fastapi items have shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`) and #11
+(`RoleAdminViews`). The remaining cross-repo work (ui's half of #12, core's #14) is tracked in those repos.
+
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it
 - [ ] PyFinBot's greenfield build fully on it
@@ -16,10 +20,12 @@
 
 ### BottleBot
 - [ ] Adopt `register_auth`, if/when BottleBot grows a login (lowest priority)
+- [ ] Adopt `register_permissions`/`register_settings` alongside `register_auth` (same trigger, lowest priority)
 - [ ] Replace watchlist's `_watchlist_page_params`/`_next_url` with `query.page_params`/`query.next_page_url` (v0.7)
 
 ### PyFinBot
 - [ ] Register everything from `greentechhub-fastapi` from the start (greenfield)
+- [ ] Adopt `register_permissions` + `register_settings` (with core's `USER_PREFERENCES` and `[sqlalchemy]` stores, `SettingsViews` and the `settings_context` processor) and `RoleAdminViews` over a SQLAlchemy `GrantStore` — all have shipped
 - [ ] Follow-up pass on the PyFinBot web interface brief — it currently references `greentechhub-core`'s auth adapter directly rather than this package
 
 ### Market Watch (planned)

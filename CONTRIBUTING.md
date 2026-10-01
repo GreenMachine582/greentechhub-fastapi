@@ -43,5 +43,6 @@ blocks it).
 
 Repository rulesets (source of truth: [`.github/rulesets/`](.github/rulesets/), applied with
 `scripts/apply-rulesets.sh`): `main` and `dev` need a PR and green checks, no force-push or deletion; `v*` tags
-can't be moved or deleted, and only release-please (the `gth-release-bot` app) creates them. The admin can bypass in an emergency — every bypass is logged, so use it for fixing a
-broken pipeline, not for skipping one.
+can't be moved or deleted, and only release-please (the `gth-release-bot` app) creates them. In an emergency the admin can merge a PR past failing checks (a logged bypass) — but
+nobody, admin included, can push straight to `main` or `dev`. Use the bypass for fixing a broken pipeline, not
+for skipping one.
