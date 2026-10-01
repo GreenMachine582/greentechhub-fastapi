@@ -14,8 +14,6 @@ Thin wiring over `greentechhub-core`'s settings and role resolution (design:
 is opt-in: nothing runs until the service calls the `register_*` function or mounts the views. Everything works with
 `AUTH_ADAPTER=local`, with no Authentik needed. Each PR updates any doc it would otherwise contradict. The numbers are
 the cross-repo order: core #1–#4 and fastapi #5 (`register_permissions`) have shipped.
-- [ ] **Pin `greentechhub-core` to its next release tag.** #5 pins the core `dev` commit carrying `RoleResolver`
-  (core #1–#4 aren't tagged yet); swap the SHA for the tag once core cuts that release.
 - [ ] **#9 `feat(settings): register_settings and SettingsViews`**
   - `register_settings(app, settings, *, registry, store, manage_permission=None)`.
   - `get_settings_service`/`get_effective_settings` dependencies.
