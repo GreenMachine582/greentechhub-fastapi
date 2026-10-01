@@ -5,6 +5,20 @@ version). From v0.8.0 on, entries are written by [release-please](https://github
 from conventional commits; the same notes are published as
 [GitHub Releases](https://github.com/GreenMachine582/greentechhub-fastapi/releases).
 
+## [0.9.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.8.0...v0.9.0) (2026-10-01)
+
+
+### Features
+
+* **permissions:** register_permissions and require_permission ([#7](https://github.com/GreenMachine582/greentechhub-fastapi/issues/7)) ([d061930](https://github.com/GreenMachine582/greentechhub-fastapi/commit/d061930be0caaff62aa1c029cac9e9017f6da16e))
+* **permissions:** role assignment admin page ([#15](https://github.com/GreenMachine582/greentechhub-fastapi/issues/15)) ([802eb81](https://github.com/GreenMachine582/greentechhub-fastapi/commit/802eb81f15ef0a8b74e67447cbef595c790c804a))
+* **settings:** register_settings and SettingsViews ([#14](https://github.com/GreenMachine582/greentechhub-fastapi/issues/14)) ([3318cdb](https://github.com/GreenMachine582/greentechhub-fastapi/commit/3318cdb888d92cbb6b379d1de8d33ec17d9359da))
+
+
+### Build
+
+* **deps:** pin greentechhub-core v0.7.0 ([#8](https://github.com/GreenMachine582/greentechhub-fastapi/issues/8)) ([0078b85](https://github.com/GreenMachine582/greentechhub-fastapi/commit/0078b853da77100ac5f1de2a235488eeeb9c2f05))
+
 ## [0.8.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.7.0...v0.8.0) (2026-09-24)
 
 ### Features
