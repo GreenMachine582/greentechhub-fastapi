@@ -76,4 +76,65 @@ Two optional settings feed the built resolver, read tolerantly like `CORS_ALLOWE
 Both `require_*` builders return the `Identity`, validate `p` when they're built, and share one resolver lookup per
 request. The JSON envelopes need `register_exception_handlers`.
 
+## Settings
+
+`register_settings` puts `greentechhub-core`'s `Settings` on the app and, with `views`, mounts a working `/settings`
+page. It's opt-in, works with `AUTH_ADAPTER=local` alone, and doesn't import greentechhub-ui: it passes data, and
+`SettingsViews` renders greentechhub-ui's ready-made `settings_page.html` / `settings_section.html` by default.
+
+```python
+from greentechhub_core.settings import JsonFileSettingsStore, SettingsRegistry
+from greentechhub_core.settings.builtins import USER_PREFERENCES
+from greentechhub_fastapi import register_auth, register_permissions, register_settings
+from greentechhub_fastapi.settings import SettingsViews, settings_context
+from greentechhub_fastapi.templating import ui_context
+
+templates = Jinja2Templates(directory="templates", context_processors=[ui_context, settings_context])
+greentechhub_ui.install(templates.env, service_name="…", nav_items=[…])
+
+register_auth(app, settings)
+register_permissions(app, settings, roles=[ADMIN])        # ROLE_BOOTSTRAP=alice=admin for the first admin
+register_settings(
+    app, settings,
+    registry=SettingsRegistry([*USER_PREFERENCES, BANNER]),
+    store=JsonFileSettingsStore("data/settings.json"),    # or core's SQLAlchemySettingsStore
+    views=SettingsViews(templates=templates),             # optional: the /settings page
+    manage_permission="settings.manage",                  # optional: the App section
+    logout_url="/logout",                                 # optional: the user menu's Log out
+)
+```
+
+`register_settings` returns the `Settings` it built. A malformed env override, a malformed `manage_permission`, or a
+`manage_permission` without `register_permissions` fails at startup. Call it before the app starts.
+
+**Page context.** `register_settings` adds `SettingsContextMiddleware` (innermost, after proxy headers and auth). For
+page requests (`Accept: text/html`, or an htmx request) it resolves the user, their granted permissions and their
+effective settings once; JSON and static requests skip it. `settings_context`, a `Jinja2Templates` context
+processor, turns that into greentechhub-ui's optional template keys:
+
+| Key | When |
+|---|---|
+| `current_user`, `user_settings` | every page request (`user_settings`: the effective values, e.g. `ui.page_size`) |
+| `granted` | when `register_permissions` ran |
+| `theme_mode` | signed in, and `ui.theme` is registered |
+| `theme_save_url`, `user_menu_items` (Settings) | signed in, and `views` were mounted |
+| `logout_url` | signed in, and `logout_url` was given |
+
+**The page (`SettingsViews`).**
+
+| Route | Does |
+|---|---|
+| `GET /settings` | Preferences (the registry's USER settings) for any signed-in user; App (its APP settings) too when they hold `manage_permission`. Anonymous → login redirect |
+| `POST /settings/preferences` | coerce each field; 422 with the section and its errors, or save and return the section with a toast (plus `gth:theme` when the theme changed) |
+| `POST /settings/app` | the same for APP settings; 403 without `manage_permission` |
+| `POST /settings/theme` | the theme toggle's save (`theme=light\|dark`): 204, 401 anonymous, 422 invalid |
+
+- A preference saved equal to what the user would get anyway (the app value, env override or default) resets their
+  own value instead of storing it, so saving an untouched form doesn't pin today's defaults.
+- Subclass to change `url`, `login_url`, `title`, the section titles/descriptions, or `page_template` /
+  `section_template` to use your own templates (they get `settings_sections` / `section`, see greentechhub-ui's
+  docs/components.md).
+- Dependencies for your own routes, in `greentechhub_fastapi.settings`: `get_settings_service` (the `Settings`) and
+  `get_effective_settings` (the current user's values).
+
 See [docs/auth.md](auth.md), [docs/health.md](health.md), and [docs/modules.md](modules.md) for what each `register_*` call actually wires up.

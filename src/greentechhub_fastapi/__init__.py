@@ -36,6 +36,10 @@ register_permissions joins them on the same grounds; its per-route
 dependencies (get_granted_permissions, require_permission,
 require_page_permission in greentechhub_fastapi.permissions) stay
 un-re-exported.
+
+register_settings likewise; SettingsViews, settings_context and the
+get_settings_service / get_effective_settings dependencies live in
+greentechhub_fastapi.settings.
 """
 
 from greentechhub_fastapi.exceptions import register_exception_handlers
@@ -47,6 +51,7 @@ from greentechhub_fastapi.registration import (
     register_health,
     register_logging,
     register_permissions,
+    register_settings,
 )
 
 __all__ = [
@@ -58,4 +63,5 @@ __all__ = [
     "register_health",
     "register_logging",
     "register_permissions",
+    "register_settings",
 ]
