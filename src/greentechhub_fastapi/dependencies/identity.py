@@ -14,10 +14,11 @@ UnauthorizedError to a 401 JSON envelope), keeping every "the caller isn't
 who/what we need them to be" response in this ecosystem shaped the same way
 regardless of which layer raised it.
 
-Feature-flag lookups and permission/RBAC checks (has_permission) are
-deliberately not wrapped here or anywhere else in this module — no doc on
-either package's roadmap calls for a fastapi-side dependency for them yet;
-adding one now would be scope creep beyond what this task asked for.
+Permission checks build on these: greentechhub_fastapi.permissions'
+require_permission / require_page_permission add "and holds this
+permission" on top of the same 401 / login-redirect behaviour (see
+register_permissions). Feature-flag lookups still have no fastapi-side
+dependency.
 """
 
 from collections.abc import Awaitable, Callable

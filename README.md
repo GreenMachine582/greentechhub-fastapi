@@ -14,8 +14,9 @@ The FastAPI/Starlette-specific adapter package: turns `greentechhub-core`'s fram
 
 | Module | Responsibility | Doc |
 |---|---|---|
-| `registration` | `register_core(app)`, `register_logging(app)`, `register_health(app)`, `register_auth(app)` — one-call wiring instead of every service hand-assembling middleware | [docs/registration.md](docs/registration.md) |
+| `registration` | `register_core(app)`, `register_logging(app)`, `register_health(app)`, `register_auth(app)`, `register_permissions(app)` — one-call wiring instead of every service hand-assembling middleware | [docs/registration.md](docs/registration.md) |
 | `middleware` | Request-ID injection, timing, security headers — thin ASGI middleware wrapping `greentechhub-core`'s pure logic (e.g. `proxy` header parsing) | [docs/modules.md](docs/modules.md#middleware) |
+| `permissions` | `register_permissions(app, settings, roles=...)` plus `get_granted_permissions` and `require_permission`/`require_page_permission` dependencies, over `greentechhub-core`'s `RoleResolver` (groups, a `ROLE_BOOTSTRAP` map, grants) — works with `AUTH_ADAPTER=local` alone | [docs/registration.md](docs/registration.md#permissions) |
 | `auth` | FastAPI `Depends(get_current_user)` built on `greentechhub-core`'s `IdentityProvider`; ships `local` (dev) and `forward_auth` (Authentik) configurations, selected via one setting | [docs/auth.md](docs/auth.md) |
 | `health` | A router exposing `/health`/`/health/ready`, running `greentechhub-core`'s health checks against this service's actual dependencies | [docs/health.md](docs/health.md) |
 | `query` | Converts FastAPI `Query(...)` parameters into `greentechhub-core`'s `PageRequest`/`Filter`/`Sort`, and renders results as a `Page` envelope | [docs/query.md](docs/query.md) |

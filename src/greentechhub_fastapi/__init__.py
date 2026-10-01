@@ -31,6 +31,11 @@ functions they enable at each request — flash()/get_flashes() (flash.py),
 get_event_publisher() (events.py) — stay un-re-exported, same as
 get_current_user/get_current_identity, since they're per-route Depends()
 dependencies, not registration calls.
+
+register_permissions joins them on the same grounds; its per-route
+dependencies (get_granted_permissions, require_permission,
+require_page_permission in greentechhub_fastapi.permissions) stay
+un-re-exported.
 """
 
 from greentechhub_fastapi.exceptions import register_exception_handlers
@@ -41,6 +46,7 @@ from greentechhub_fastapi.registration import (
     register_flash,
     register_health,
     register_logging,
+    register_permissions,
 )
 
 __all__ = [
@@ -51,4 +57,5 @@ __all__ = [
     "register_flash",
     "register_health",
     "register_logging",
+    "register_permissions",
 ]
