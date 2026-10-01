@@ -9,16 +9,8 @@
 ## 🗺️ Milestones
 
 ### Settings & permissions
-Thin wiring over `greentechhub-core`'s settings and role resolution (design:
-[core docs/settings.md](https://github.com/GreenMachine582/greentechhub-core/blob/dev/docs/settings.md)). Every item
-is opt-in: nothing runs until the service calls the `register_*` function or mounts the views. Everything works with
-`AUTH_ADAPTER=local`, with no Authentik needed. Each PR updates any doc it would otherwise contradict. The numbers are
-the cross-repo order: core #1–#4, fastapi #5 (`register_permissions`) and #9 (`register_settings`,
-`SettingsViews`) have shipped.
-- [ ] **#11 `feat(permissions): role assignment admin page`**
-  - `RoleAdminViews(..., permission=...)` over a `GrantStore`, gated on a permission the service supplies.
-  - Lists assignments with `gth_data_table`; assigns and revokes with `gth_multiselect`/`gth_confirm_delete`.
-  - A `local`-adapter test.
+All fastapi items have shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`) and #11
+(`RoleAdminViews`). The remaining cross-repo work (ui's half of #12, core's #14) is tracked in those repos.
 
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it
@@ -33,7 +25,7 @@ the cross-repo order: core #1–#4, fastapi #5 (`register_permissions`) and #9 (
 
 ### PyFinBot
 - [ ] Register everything from `greentechhub-fastapi` from the start (greenfield)
-- [ ] Adopt `register_permissions` + `register_settings` (with core's `USER_PREFERENCES` and `[sqlalchemy]` stores, `SettingsViews` and the `settings_context` processor) — both have shipped
+- [ ] Adopt `register_permissions` + `register_settings` (with core's `USER_PREFERENCES` and `[sqlalchemy]` stores, `SettingsViews` and the `settings_context` processor) and `RoleAdminViews` over a SQLAlchemy `GrantStore` — all have shipped
 - [ ] Follow-up pass on the PyFinBot web interface brief — it currently references `greentechhub-core`'s auth adapter directly rather than this package
 
 ### Market Watch (planned)

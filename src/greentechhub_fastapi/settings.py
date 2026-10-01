@@ -23,8 +23,6 @@ register_auth installed, and an admin can come from ROLE_BOOTSTRAP
 """
 
 import inspect
-import json
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -44,6 +42,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.dependencies.identity import require_page_identity
+from greentechhub_fastapi.htmx import _toast_trigger
 from greentechhub_fastapi.permissions import _GRANTED_STATE_KEY, RESOLVER_STATE_KEY
 
 SETTINGS_STATE_KEY = "gth_settings"
@@ -164,12 +163,6 @@ def settings_context(request: Request) -> dict[str, Any]:
     if config.logout_url:
         context["logout_url"] = config.logout_url
     return context
-
-
-def _toast(message: str, events: Mapping[str, Any] | None = None) -> str:
-    """The HX-Trigger JSON greentechhub-ui's toast() builds (showToast plus
-    extra events), without importing greentechhub-ui."""
-    return json.dumps({"showToast": {"message": message, "kind": "success"}, **(events or {})})
 
 
 class SettingsViews:
@@ -320,7 +313,7 @@ class SettingsViews:
         title = self.preferences_title if section == "preferences" else self.app_title
         return self._render_section(
             request, self._section(section, definitions, after),
-            headers={"HX-Trigger": _toast(f"{title} saved", events)},
+            headers={"HX-Trigger": _toast_trigger(f"{title} saved", events)},
         )
 
     async def _write_preferences(self, settings: Settings, user: Identity, values) -> None:

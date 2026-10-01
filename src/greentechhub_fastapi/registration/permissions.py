@@ -27,7 +27,11 @@ from typing import Any
 from fastapi import FastAPI
 from greentechhub_core.permissions import GrantStore, PermissionResolver, Role, RoleResolver
 
-from greentechhub_fastapi.permissions import RESOLVER_STATE_KEY
+from greentechhub_fastapi.permissions import (
+    GRANTS_STATE_KEY,
+    RESOLVER_STATE_KEY,
+    ROLES_STATE_KEY,
+)
 
 
 def _role_names(value: Any) -> list[str]:
@@ -72,6 +76,7 @@ def register_permissions(
 ) -> PermissionResolver:
     """Install the app's PermissionResolver and return it (handy for
     register_settings, or a sync tool sharing the same resolver)."""
+    roles = tuple(roles)
     if resolver is not None:
         if roles or grants is not None:
             raise ValueError("pass either resolver, or roles/grants to build one — not both")
@@ -83,4 +88,7 @@ def register_permissions(
             grants=grants,
         )
     setattr(app.state, RESOLVER_STATE_KEY, resolver)
+    # For RoleAdminViews: the catalogue it offers and the store it edits.
+    setattr(app.state, ROLES_STATE_KEY, roles)
+    setattr(app.state, GRANTS_STATE_KEY, grants)
     return resolver
