@@ -76,6 +76,39 @@ Two optional settings feed the built resolver, read tolerantly like `CORS_ALLOWE
 Both `require_*` builders return the `Identity`, validate `p` when they're built, and share one resolver lookup per
 request. The JSON envelopes need `register_exception_handlers`.
 
+### Role assignments
+
+`RoleAdminViews` is an admin page over the `GrantStore` passed to `register_permissions`: it lists in-app role grants
+and assigns, changes and removes them. It renders greentechhub-ui's ready-made `roles_page.html` /
+`roles_section.html` by default and passes data only, so this package still doesn't import greentechhub-ui.
+
+```python
+from greentechhub_core.sqlalchemy import SQLAlchemyGrantStore, role_grants_table
+from greentechhub_fastapi.permissions import RoleAdminViews
+
+grants = SQLAlchemyGrantStore(role_grants_table(Base.metadata), async_session_factory=Session)
+register_permissions(app, settings, roles=ROLES, grants=grants)   # ROLE_BOOTSTRAP=alice=admin
+app.include_router(RoleAdminViews(templates=templates, permission="users.manage").router())
+```
+
+| Route (`url` = `/admin/roles`) | Does |
+|---|---|
+| `GET {url}` | the page: every grant (`list_assignments`), with the service's roles as choices |
+| `POST {url}` | assign the checked roles to `subject`; 422 with errors for a blank subject or no roles |
+| `POST {url}/{subject}` | make the subject's roles exactly the checked ones (`assign` the new, `revoke` the rest) |
+| `DELETE {url}/{subject}` | revoke all of the subject's roles |
+
+- Every route needs `permission`, through `require_page_permission`: anonymous visitors go to `login_url`, users
+  without it get 403. Each write returns the section with a toast, which greentechhub-ui's section swaps in place.
+- Subjects are path segments, so one containing `/` is sent as `%2F`; the route accepts it.
+- Only known role names are assigned. A stored name that isn't in `roles` (a role deleted from code) grants nothing,
+  isn't shown, and is left alone by a change; a remove revokes it too.
+- Only grants are listed. Roles from `ROLE_GROUPS` or `ROLE_BOOTSTRAP` are configuration, which is also the recovery
+  path if an admin removes their own grant.
+- With `register_permissions(..., resolver=...)` there are no `roles`/`grants` to read, so pass them:
+  `RoleAdminViews(..., roles=ROLES, grants=grants)`. Without a `GrantStore` the page raises a `RuntimeError` naming
+  what's missing. Subclass to change `url`, `login_url`, `title` or the template names.
+
 ## Settings
 
 `register_settings` puts `greentechhub-core`'s `Settings` on the app and, with `views`, mounts a working `/settings`

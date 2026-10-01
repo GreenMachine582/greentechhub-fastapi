@@ -33,3 +33,10 @@ def hx_response(
         headers={**(headers or {}), "HX-Trigger": value},
         media_type="text/html" if content else None,
     )
+
+
+def _toast_trigger(message: str, events: Mapping[str, Any] | None = None) -> str:
+    """The HX-Trigger JSON greentechhub-ui's toast() builds (a success
+    showToast plus extra events), for this package's own views, which can't
+    import greentechhub-ui."""
+    return json.dumps({"showToast": {"message": message, "kind": "success"}, **(events or {})})
