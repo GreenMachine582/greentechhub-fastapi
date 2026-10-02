@@ -13,6 +13,18 @@ Shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`),
 (secret settings: `cipher=`, write-only saves, `get_secret`) and #21 (the landing-page redirect after login, acting
 on core #14's setting). Nothing here is open; releases next: ui v0.13.0 and fastapi v0.10.0 (core v0.8.0 is out).
 
+### From the PyFinBot review
+Generic pieces PyFinBot built for itself, to move here (opt-in) so it can delete them:
+- [ ] `LoginViews.login_template` defaults to greentechhub-ui's `login_page.html` (after ui ships it); apps can
+  still override it
+- [ ] `register_api_error_handlers(app, prefix="/api")` — the `{code, message, details}` envelope for
+  `HTTPException` (OAuth2's 401, unknown routes, 405) and request validation errors under the prefix, plus
+  `UnauthorizedError` with `WWW-Authenticate: Bearer` and core's explicit-status error (core TODO); everything else
+  keeps FastAPI's defaults. From PyFinBot's `web/api_errors.py`
+- [ ] An opt-in admin site banner — core's setting definitions (message + tone) registered with
+  `register_settings`, plus a context processor that turns them into greentechhub-ui's `site_banners`. From
+  PyFinBot's `site_banners_context`
+
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it
 - [ ] PyFinBot's greenfield build fully on it
