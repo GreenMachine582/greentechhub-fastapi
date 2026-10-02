@@ -16,7 +16,7 @@ Shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`) 
 Settings whose value is a credential (an email app password, an API token) can't be plain settings: stores keep JSON
 as-is, `effective()` returns values to templates, and `SettingsViews` echoes a `str` back into the form. These items
 add an opt-in **secret** kind across the three packages. Order across repos: core #18 → ui #19 → fastapi #20, then
-releases core v0.8.0, ui v0.13.0 and fastapi v0.10.0 (fastapi pins core v0.8.0 first). The first consumer is
+releases core v0.8.0, ui v0.13.0 and fastapi v0.10.0 (core v0.8.0 is out and pinned). The first consumer is
 PyFinBot's per-user email account for Commsec sync (its app password), registered in PyFinBot's `todo.md`.
 - [ ] **#20 `feat(settings): secret settings in SettingsViews`**
   - `register_settings(..., cipher=None)` passes the cipher to core's `Settings`.
@@ -25,12 +25,10 @@ PyFinBot's per-user email account for Commsec sync (its app password), registere
   - A `get_secret` dependency helper for routes that need the plaintext.
   - Tests: no plaintext in any rendered HTML; blank keeps, clear resets; a wrong or missing cipher fails at startup.
   - Docs: `docs/registration.md` (Settings).
-- [ ] **`build(deps): pin greentechhub-core v0.8.0`**, before #20 (it needs core's secret settings).
 
 #### Landing page
 Core #14 shipped `landing_page_setting` and `LANDING_PAGE_KEY` (`ui.landing_page`): a per-user choice of the service's
-own pages. Nothing acts on it yet. It needs a core release containing #14 (core v0.8.0, with the secret settings), so
-it goes after the `build(deps): pin greentechhub-core v0.8.0` item above.
+own pages. Nothing acts on it yet. Core v0.8.0, pinned here, carries it.
 - [ ] **#21 `feat(settings): send users to their landing page after login`**
   - When `register_settings` is on and the registry has core's `LANDING_PAGE_KEY`, `LoginViews` redirects a
     successful login to the user's `ui.landing_page` instead of `redirect_url`. Without either, `redirect_url` is
