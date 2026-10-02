@@ -3,7 +3,7 @@
 # publishes the GitHub Release. Then main is merged back into dev so dev
 # carries the new version and changelog. See CONTRIBUTING.md.
 #
-# Tokens come from the gth-release-bot GitHub App (vars.RELEASE_APP_ID +
+# Tokens come from the gth-release-bot GitHub App (vars.RELEASE_APP_CLIENT_ID +
 # secrets.RELEASE_APP_PRIVATE_KEY): short-lived, and — unlike GITHUB_TOKEN —
 # its release PR triggers CI, and it's the bypass actor the dev and tag rulesets
 # allow (the built-in GitHub Actions integration can't be one on a personal
@@ -26,10 +26,10 @@ jobs:
       releases_created: ${{ steps.release.outputs.releases_created }}
     steps:
       - id: app-token
-        if: vars.RELEASE_APP_ID != ''
+        if: vars.RELEASE_APP_CLIENT_ID != ''
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
       - id: release
         uses: googleapis/release-please-action@v5
@@ -47,10 +47,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - id: app-token
-        if: vars.RELEASE_APP_ID != ''
+        if: vars.RELEASE_APP_CLIENT_ID != ''
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v7
         with:
