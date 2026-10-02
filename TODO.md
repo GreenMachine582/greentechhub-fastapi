@@ -9,22 +9,9 @@
 ## 🗺️ Milestones
 
 ### Settings & permissions
-Shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`) and #11 (`RoleAdminViews`). Open:
-#20 (secret settings) and #21 (the landing-page redirect, acting on core #14's setting), below.
-
-#### Secret settings
-Settings whose value is a credential (an email app password, an API token) can't be plain settings: stores keep JSON
-as-is, `effective()` returns values to templates, and `SettingsViews` echoes a `str` back into the form. These items
-add an opt-in **secret** kind across the three packages. Order across repos: core #18 → ui #19 → fastapi #20, then
-releases core v0.8.0, ui v0.13.0 and fastapi v0.10.0 (core v0.8.0 is out and pinned). The first consumer is
-PyFinBot's per-user email account for Commsec sync (its app password), registered in PyFinBot's `todo.md`.
-- [ ] **#20 `feat(settings): secret settings in SettingsViews`**
-  - `register_settings(..., cipher=None)` passes the cipher to core's `Settings`.
-  - On save, a blank secret field keeps the stored value, and the `<key>.__clear` box resets it.
-  - Secrets never reach `user_settings`, the section's `values` or any template context. Only the marker does.
-  - A `get_secret` dependency helper for routes that need the plaintext.
-  - Tests: no plaintext in any rendered HTML; blank keeps, clear resets; a wrong or missing cipher fails at startup.
-  - Docs: `docs/registration.md` (Settings).
+Shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`), #11 (`RoleAdminViews`) and #20
+(secret settings: `cipher=`, write-only saves, `get_secret`). Releases next: ui v0.13.0 and fastapi v0.10.0 (core
+v0.8.0 is out). Open: #21 (the landing-page redirect, acting on core #14's setting), below.
 
 #### Landing page
 Core #14 shipped `landing_page_setting` and `LANDING_PAGE_KEY` (`ui.landing_page`): a per-user choice of the service's

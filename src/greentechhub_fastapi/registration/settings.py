@@ -2,8 +2,9 @@
 optionally mounts the settings page.
 
 Opt-in like every register_* call. It:
-  - builds core's Settings(registry, store) — a malformed env override
-    (SETTING_UI__PAGE_SIZE=lots) fails here, at startup;
+  - builds core's Settings(registry, store, cipher=cipher) — a malformed
+    env override (SETTING_UI__PAGE_SIZE=lots), or a secret setting without
+    a cipher, fails here, at startup;
   - adds SettingsContextMiddleware innermost, so page requests carry the
     user, granted permissions and effective settings for
     settings.settings_context (the Jinja2Templates context processor);
@@ -21,7 +22,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from greentechhub_core.permissions import Permission
-from greentechhub_core.settings import Settings, SettingsRegistry, SettingsStore
+from greentechhub_core.settings import SecretCipher, Settings, SettingsRegistry, SettingsStore
 from starlette.middleware import Middleware
 
 from greentechhub_fastapi.permissions import RESOLVER_STATE_KEY
@@ -43,18 +44,21 @@ def register_settings(
     manage_permission: str | None = None,
     logout_url: str | None = None,
     env: Mapping[str, Any] | None = None,
+    cipher: SecretCipher | None = None,
 ) -> Settings:
     """Install the app's Settings and return it (a sync tool or a route can
     share it). `settings` is the service's GTHBaseSettings, accepted for
     symmetry with the other register_* calls; values come from `registry`
     and `store`. `logout_url` is offered to greentechhub-ui's user menu
-    (e.g. LoginViews' "/logout")."""
+    (e.g. LoginViews' "/logout"). `cipher` (e.g. core's
+    settings.crypto.FernetCipher) encrypts the registry's secret settings;
+    it's required when there are any."""
     if app.middleware_stack is not None:
         raise RuntimeError("register_settings must run before the app starts")
     permission = Permission(manage_permission) if manage_permission is not None else None
     if permission is not None and getattr(app.state, RESOLVER_STATE_KEY, None) is None:
         raise RuntimeError("manage_permission needs register_permissions(app, ...) first")
-    service = Settings(registry, store, env=env)
+    service = Settings(registry, store, env=env, cipher=cipher)
     setattr(
         app.state,
         SETTINGS_STATE_KEY,
