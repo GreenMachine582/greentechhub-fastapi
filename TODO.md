@@ -9,8 +9,9 @@
 ## 🗺️ Milestones
 
 ### Settings & permissions
-All fastapi items have shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`) and #11
-(`RoleAdminViews`). The remaining cross-repo work (ui's half of #12, core's #14) is tracked in those repos.
+Shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`), #11 (`RoleAdminViews`), #20
+(secret settings: `cipher=`, write-only saves, `get_secret`) and #21 (the landing-page redirect after login, acting
+on core #14's setting). Nothing here is open; releases next: ui v0.13.0 and fastapi v0.10.0 (core v0.8.0 is out).
 
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it

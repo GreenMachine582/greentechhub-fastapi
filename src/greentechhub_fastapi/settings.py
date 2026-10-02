@@ -12,10 +12,20 @@ registration.settings.register_settings, over greentechhub-core's Settings.
   Context processors are sync, which is why the middleware does the async
   work up front.
 - get_settings_service / get_effective_settings: Depends() helpers.
+- get_secret(key): a Depends() factory for a secret setting's plaintext,
+  for server code (e.g. an IMAP login), never a template.
+- landing_url: the user's chosen landing page (core's landing_page_setting),
+  which LoginViews redirects to after a login.
 - SettingsViews: the /settings page, its two section saves and the theme
   toggle's save endpoint, in LoginViews' style. It renders greentechhub-ui's
   settings_page.html / settings_section.html by default, passing data only:
   nothing here imports greentechhub-ui.
+
+Secret settings (core's Setting.secret) only ever reach a template or a
+JSON response as core's SECRET_SET marker (or None): core's effective()
+masks them, and SettingsViews never echoes a submitted one. On save a blank
+secret field keeps the stored value and a "<key>.__clear" box resets it,
+the contract greentechhub-ui's write-only field posts.
 
 Works with AUTH_ADAPTER=local alone: the user comes from whatever
 register_auth installed, and an admin can come from ROLE_BOOTSTRAP
@@ -38,6 +48,7 @@ from greentechhub_core.settings import (
     SettingScope,
     SettingType,
 )
+from greentechhub_core.settings.builtins import LANDING_PAGE_KEY
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from greentechhub_fastapi.auth.dependency import get_current_user
@@ -138,6 +149,43 @@ async def get_effective_settings(
     return await get_settings_service(request).effective(user)
 
 
+def get_secret(key: str):
+    """A dependency returning secret setting `key`'s plaintext for the
+    current user (their value, else the app value, else None):
+
+        password: str | None = Depends(get_secret("email.app_password"))
+
+    For server code only; never pass it to a template. Core raises
+    ValueError when `key` isn't a secret setting and SecretDecryptError when
+    the cipher can't decrypt the stored value (the key changed).
+    """
+
+    async def dependency(
+        request: Request, user: Identity | None = Depends(get_current_user)
+    ) -> str | None:
+        return await get_settings_service(request).get_secret(key, user)
+
+    return dependency
+
+
+async def landing_url(request: Request, identity: Identity | None, *, fallback: str = "/") -> str:
+    """Where `identity` lands: their `ui.landing_page` (core's
+    landing_page_setting), else its app value or default. `fallback` when
+    register_settings didn't run or the registry has no landing-page
+    setting, so this is opt-in.
+
+    The value is always one of the setting's choices (core validates it and
+    skips a stored page that's no longer one), so it's never an open
+    redirect. LoginViews uses it after a login; use it on your own routes
+    too, e.g. a "/home" that isn't itself a choice. "/" is never redirected
+    automatically, since it may itself be a choice.
+    """
+    config = getattr(request.app.state, SETTINGS_STATE_KEY, None)
+    if config is None or LANDING_PAGE_KEY not in config.settings.registry:
+        return fallback
+    return await config.settings.get(LANDING_PAGE_KEY, identity) or fallback
+
+
 def settings_context(request: Request) -> dict[str, Any]:
     """Jinja2Templates context processor for greentechhub-ui's optional
     keys. Empty when the middleware didn't run (JSON, static), so it's safe
@@ -179,7 +227,9 @@ class SettingsViews:
     the section with a toast (and greentechhub-ui's `gth:theme` event when
     the theme changed). A preference equal to what the user would get
     without one is reset rather than stored, so saving an untouched form
-    doesn't pin today's defaults.
+    doesn't pin today's defaults. A secret setting is write-only: a
+    non-blank field saves it (encrypted by core), "<key>.__clear" = "true"
+    resets it, and a blank field leaves it as it is.
 
     POST {url}/theme: the theme toggle's save (form field `theme`), 204.
 
@@ -279,8 +329,17 @@ class SettingsViews:
         form = await request.form()
         submitted: dict[str, Any] = {}
         errors: dict[str, list[str]] = {}
+        # Secrets stay out of `submitted`, so a 422 never echoes one: key →
+        # plaintext to save, or None to reset.
+        secrets: dict[str, str | None] = {}
         for setting in definitions:
             raw = form.get(setting.key)
+            if setting.secret:
+                if form.get(f"{setting.key}.__clear") == "true":
+                    secrets[setting.key] = None
+                elif raw:
+                    secrets[setting.key] = str(raw)
+                continue
             if raw is None:
                 if setting.type is SettingType.BOOL:
                     raw = "false"  # an unchecked checkbox without gth_switch's off_value
@@ -300,10 +359,20 @@ class SettingsViews:
         try:
             if section == "preferences":
                 await self._write_preferences(settings, user, submitted)
+                for key, value in secrets.items():
+                    if value is None:
+                        await settings.reset_user(user, key)
+                    else:
+                        await settings.set_user(user, key, value)
             else:
                 granted = await _granted(request, user) or frozenset()
                 for key, value in submitted.items():
                     await settings.set_app(key, value, granted=granted)
+                for key, value in secrets.items():
+                    if value is None:
+                        await settings.reset_app(key, granted=granted)
+                    else:
+                        await settings.set_app(key, value, granted=granted)
         except SettingPermissionError:
             return Response(status_code=403)
         after = await settings.effective(user)

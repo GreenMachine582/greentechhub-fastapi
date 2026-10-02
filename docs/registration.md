@@ -137,8 +137,57 @@ register_settings(
 )
 ```
 
-`register_settings` returns the `Settings` it built. A malformed env override, a malformed `manage_permission`, or a
-`manage_permission` without `register_permissions` fails at startup. Call it before the app starts.
+`register_settings` returns the `Settings` it built. A malformed env override, a malformed `manage_permission`, a
+`manage_permission` without `register_permissions`, or a secret setting without a `cipher` fails at startup. Call it
+before the app starts.
+
+**Secret settings.** A credential (an email app password, an API token) is a core `Setting(..., secret=True)`:
+encrypted at rest, write-only on the page. Pass a cipher, from core's `[crypto]` extra
+(`pip install 'greentechhub-core[crypto]'`), with its key kept in your config, never in the store:
+
+```python
+from greentechhub_core.settings.crypto import FernetCipher   # FernetCipher.generate_key() makes a key
+
+register_settings(app, settings, registry=registry, store=store, views=SettingsViews(templates=templates),
+                  cipher=FernetCipher(settings.SETTINGS_CIPHER_KEY))
+```
+
+- A registry with a secret setting and no `cipher` fails at startup.
+- Secrets only ever reach a template or a JSON value as core's `SECRET_SET` marker (or `None` when unset):
+  `user_settings`, the sections' `values` and `get_effective_settings` all carry the marker, and a 422 never echoes
+  a submitted secret. greentechhub-ui (v0.13+) renders the field as an always-empty password input.
+- On save, a blank field keeps the stored value, `<key>.__clear=true` resets it, and anything else is the new value
+  (core encrypts it). APP secrets still need `manage_permission` and their own `edit_permission`.
+- Server code reads the plaintext through `get_secret(key)`, a dependency factory: the user's value, else the app
+  value, else `None`. It raises core's `SecretDecryptError` if the cipher key changed since the value was saved.
+
+```python
+from greentechhub_fastapi.settings import get_secret
+
+@app.post("/emails/sync")
+async def sync(password: str | None = Depends(get_secret("email.app_password"))): ...
+```
+
+**Landing page.** Register core's `landing_page_setting` and each person picks the page they land on after logging
+in. It shows on `/settings` under Navigation like any choice setting:
+
+```python
+from greentechhub_core.settings.builtins import USER_PREFERENCES, landing_page_setting
+
+registry = SettingsRegistry([
+    *USER_PREFERENCES,
+    landing_page_setting({"/": "Dashboard", "/reports": "Reports"}, default="/"),
+])
+```
+
+- `LoginViews` then redirects a successful login to the user's choice (else the app value or the setting's default)
+  instead of `redirect_url`. Without `register_settings`, or without the setting, `redirect_url` applies as before.
+- `landing_url(request, identity, *, fallback="/")` (async, `greentechhub_fastapi.settings`) gives the same page for
+  your own routes, e.g. a `/home` that isn't itself one of the choices. `fallback` applies when the setting isn't
+  registered.
+- The page is always one of the setting's choices (core validates it, and a stored page later removed from the
+  choices falls back to the default), so it's never an open redirect. `/` is never redirected automatically, since it
+  may itself be a choice.
 
 **Page context.** `register_settings` adds `SettingsContextMiddleware` (innermost, after proxy headers and auth). For
 page requests (`Accept: text/html`, or an htmx request) it resolves the user, their granted permissions and their
@@ -167,7 +216,8 @@ processor, turns that into greentechhub-ui's optional template keys:
 - Subclass to change `url`, `login_url`, `title`, the section titles/descriptions, or `page_template` /
   `section_template` to use your own templates (they get `settings_sections` / `section`, see greentechhub-ui's
   docs/components.md).
-- Dependencies for your own routes, in `greentechhub_fastapi.settings`: `get_settings_service` (the `Settings`) and
-  `get_effective_settings` (the current user's values).
+- Dependencies for your own routes, in `greentechhub_fastapi.settings`: `get_settings_service` (the `Settings`),
+  `get_effective_settings` (the current user's values, secrets as the marker) and `get_secret(key)` (a secret's
+  plaintext).
 
 See [docs/auth.md](auth.md), [docs/health.md](health.md), and [docs/modules.md](modules.md) for what each `register_*` call actually wires up.
