@@ -14,6 +14,8 @@ registration.settings.register_settings, over greentechhub-core's Settings.
 - get_settings_service / get_effective_settings: Depends() helpers.
 - get_secret(key): a Depends() factory for a secret setting's plaintext,
   for server code (e.g. an IMAP login), never a template.
+- landing_url: the user's chosen landing page (core's landing_page_setting),
+  which LoginViews redirects to after a login.
 - SettingsViews: the /settings page, its two section saves and the theme
   toggle's save endpoint, in LoginViews' style. It renders greentechhub-ui's
   settings_page.html / settings_section.html by default, passing data only:
@@ -46,6 +48,7 @@ from greentechhub_core.settings import (
     SettingScope,
     SettingType,
 )
+from greentechhub_core.settings.builtins import LANDING_PAGE_KEY
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from greentechhub_fastapi.auth.dependency import get_current_user
@@ -163,6 +166,24 @@ def get_secret(key: str):
         return await get_settings_service(request).get_secret(key, user)
 
     return dependency
+
+
+async def landing_url(request: Request, identity: Identity | None, *, fallback: str = "/") -> str:
+    """Where `identity` lands: their `ui.landing_page` (core's
+    landing_page_setting), else its app value or default. `fallback` when
+    register_settings didn't run or the registry has no landing-page
+    setting, so this is opt-in.
+
+    The value is always one of the setting's choices (core validates it and
+    skips a stored page that's no longer one), so it's never an open
+    redirect. LoginViews uses it after a login; use it on your own routes
+    too, e.g. a "/home" that isn't itself a choice. "/" is never redirected
+    automatically, since it may itself be a choice.
+    """
+    config = getattr(request.app.state, SETTINGS_STATE_KEY, None)
+    if config is None or LANDING_PAGE_KEY not in config.settings.registry:
+        return fallback
+    return await config.settings.get(LANDING_PAGE_KEY, identity) or fallback
 
 
 def settings_context(request: Request) -> dict[str, Any]:

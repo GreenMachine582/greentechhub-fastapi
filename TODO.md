@@ -9,25 +9,9 @@
 ## 🗺️ Milestones
 
 ### Settings & permissions
-Shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`), #11 (`RoleAdminViews`) and #20
-(secret settings: `cipher=`, write-only saves, `get_secret`). Releases next: ui v0.13.0 and fastapi v0.10.0 (core
-v0.8.0 is out). Open: #21 (the landing-page redirect, acting on core #14's setting), below.
-
-#### Landing page
-Core #14 shipped `landing_page_setting` and `LANDING_PAGE_KEY` (`ui.landing_page`): a per-user choice of the service's
-own pages. Nothing acts on it yet. Core v0.8.0, pinned here, carries it.
-- [ ] **#21 `feat(settings): send users to their landing page after login`**
-  - When `register_settings` is on and the registry has core's `LANDING_PAGE_KEY`, `LoginViews` redirects a
-    successful login to the user's `ui.landing_page` instead of `redirect_url`. Without either, `redirect_url` is
-    unchanged (opt-in).
-  - `landing_url(request, identity, *, fallback="/")`, sync and async, returns the resolved page, for a service's own
-    routes (e.g. a `/` that isn't itself one of the choices).
-  - The value is always one of the setting's choices (core validates it), so it isn't an open redirect. `/` is never
-    redirected automatically, since "/" may itself be a choice and would loop.
-  - Tests: login lands on the chosen page; the default when unset; `redirect_url` without the setting or without
-    `register_settings`; a stale stored page falls back to the default; an HTMX login gets `HX-Redirect` to the same
-    URL.
-  - Docs: `docs/registration.md` (Settings and LoginViews).
+Shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`), #11 (`RoleAdminViews`), #20
+(secret settings: `cipher=`, write-only saves, `get_secret`) and #21 (the landing-page redirect after login, acting
+on core #14's setting). Nothing here is open; releases next: ui v0.13.0 and fastapi v0.10.0 (core v0.8.0 is out).
 
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it

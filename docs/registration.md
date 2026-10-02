@@ -168,6 +168,27 @@ from greentechhub_fastapi.settings import get_secret
 async def sync(password: str | None = Depends(get_secret("email.app_password"))): ...
 ```
 
+**Landing page.** Register core's `landing_page_setting` and each person picks the page they land on after logging
+in. It shows on `/settings` under Navigation like any choice setting:
+
+```python
+from greentechhub_core.settings.builtins import USER_PREFERENCES, landing_page_setting
+
+registry = SettingsRegistry([
+    *USER_PREFERENCES,
+    landing_page_setting({"/": "Dashboard", "/reports": "Reports"}, default="/"),
+])
+```
+
+- `LoginViews` then redirects a successful login to the user's choice (else the app value or the setting's default)
+  instead of `redirect_url`. Without `register_settings`, or without the setting, `redirect_url` applies as before.
+- `landing_url(request, identity, *, fallback="/")` (async, `greentechhub_fastapi.settings`) gives the same page for
+  your own routes, e.g. a `/home` that isn't itself one of the choices. `fallback` applies when the setting isn't
+  registered.
+- The page is always one of the setting's choices (core validates it, and a stored page later removed from the
+  choices falls back to the default), so it's never an open redirect. `/` is never redirected automatically, since it
+  may itself be a choice.
+
 **Page context.** `register_settings` adds `SettingsContextMiddleware` (innermost, after proxy headers and auth). For
 page requests (`Accept: text/html`, or an htmx request) it resolves the user, their granted permissions and their
 effective settings once; JSON and static requests skip it. `settings_context`, a `Jinja2Templates` context
