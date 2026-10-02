@@ -56,6 +56,10 @@ class LoginViews(ABC):
     Ships GET/POST /login and POST /logout. Not prefixed — mount at whatever
     path the service wants these to live at (matching how register_auth
     itself takes no path opinion either).
+
+    A successful login lands on the user's chosen page when register_settings
+    registered core's landing_page_setting (settings.landing_url), else on
+    `redirect_url`.
     """
 
     #: Template name resolved against the Jinja2Templates instance passed to
@@ -64,7 +68,8 @@ class LoginViews(ABC):
     #: {"error": "..."} on a failed login, {} otherwise.
     login_template: str = "login.html"
 
-    #: Where a successful login redirects to.
+    #: Where a successful login redirects to — or, when the service registered
+    #: core's landing_page_setting, the fallback if it can't be resolved.
     redirect_url: str = "/"
 
     #: Where GET /login lives — logout redirects here, and this is also
@@ -111,8 +116,13 @@ class LoginViews(ABC):
                 status_code=401,
             )
 
+        # Imported here: greentechhub_fastapi.settings imports auth.dependency,
+        # whose package __init__ imports this module.
+        from greentechhub_fastapi.settings import landing_url
+
         token = self._identity_provider.issue(identity)
-        response = RedirectResponse(url=self.redirect_url, status_code=303)
+        url = await landing_url(request, identity, fallback=self.redirect_url)
+        response = RedirectResponse(url=url, status_code=303)
         create_session_cookie(response, token)
         return response
 
