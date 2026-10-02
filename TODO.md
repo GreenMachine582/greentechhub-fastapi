@@ -10,7 +10,7 @@
 
 ### Settings & permissions
 Shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`) and #11 (`RoleAdminViews`). Open:
-#20 below (secret settings). The rest of the cross-repo work (core's #14, on hold) is tracked in core.
+#20 (secret settings) and #21 (the landing-page redirect, acting on core #14's setting), below.
 
 #### Secret settings
 Settings whose value is a credential (an email app password, an API token) can't be plain settings: stores keep JSON
@@ -26,6 +26,23 @@ PyFinBot's per-user email account for Commsec sync (its app password), registere
   - Tests: no plaintext in any rendered HTML; blank keeps, clear resets; a wrong or missing cipher fails at startup.
   - Docs: `docs/registration.md` (Settings).
 - [ ] **`build(deps): pin greentechhub-core v0.8.0`**, before #20 (it needs core's secret settings).
+
+#### Landing page
+Core #14 shipped `landing_page_setting` and `LANDING_PAGE_KEY` (`ui.landing_page`): a per-user choice of the service's
+own pages. Nothing acts on it yet. It needs a core release containing #14 (core v0.8.0, with the secret settings), so
+it goes after the `build(deps): pin greentechhub-core v0.8.0` item above.
+- [ ] **#21 `feat(settings): send users to their landing page after login`**
+  - When `register_settings` is on and the registry has core's `LANDING_PAGE_KEY`, `LoginViews` redirects a
+    successful login to the user's `ui.landing_page` instead of `redirect_url`. Without either, `redirect_url` is
+    unchanged (opt-in).
+  - `landing_url(request, identity, *, fallback="/")`, sync and async, returns the resolved page, for a service's own
+    routes (e.g. a `/` that isn't itself one of the choices).
+  - The value is always one of the setting's choices (core validates it), so it isn't an open redirect. `/` is never
+    redirected automatically, since "/" may itself be a choice and would loop.
+  - Tests: login lands on the chosen page; the default when unset; `redirect_url` without the setting or without
+    `register_settings`; a stale stored page falls back to the default; an HTMX login gets `HX-Redirect` to the same
+    URL.
+  - Docs: `docs/registration.md` (Settings and LoginViews).
 
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it
