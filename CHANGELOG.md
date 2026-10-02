@@ -5,6 +5,19 @@ version). From v0.8.0 on, entries are written by [release-please](https://github
 from conventional commits; the same notes are published as
 [GitHub Releases](https://github.com/GreenMachine582/greentechhub-fastapi/releases).
 
+## [0.10.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.9.0...v0.10.0) (2026-10-02)
+
+
+### Features
+
+* **settings:** secret settings in SettingsViews ([#21](https://github.com/GreenMachine582/greentechhub-fastapi/issues/21)) ([b91ce6b](https://github.com/GreenMachine582/greentechhub-fastapi/commit/b91ce6b77d25b7d17a630330e4410707351bd9f2))
+* **settings:** send users to their landing page after login ([#22](https://github.com/GreenMachine582/greentechhub-fastapi/issues/22)) ([d3ae099](https://github.com/GreenMachine582/greentechhub-fastapi/commit/d3ae099a7d95c3f462318180aaaa121ebf512135))
+
+
+### Build
+
+* **deps:** pin greentechhub-core v0.8.0 ([#20](https://github.com/GreenMachine582/greentechhub-fastapi/issues/20)) ([73c5504](https://github.com/GreenMachine582/greentechhub-fastapi/commit/73c550406dd1601eed6a09ee3b0fcf9bbc6270fe))
+
 ## [0.9.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.8.0...v0.9.0) (2026-10-01)
 
 
