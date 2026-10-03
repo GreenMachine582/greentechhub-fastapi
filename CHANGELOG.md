@@ -5,6 +5,17 @@ version). From v0.8.0 on, entries are written by [release-please](https://github
 from conventional commits; the same notes are published as
 [GitHub Releases](https://github.com/GreenMachine582/greentechhub-fastapi/releases).
 
+## [0.11.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.10.0...v0.11.0) (2026-10-03)
+
+
+### Features
+
+* **auth:** LoginViews uses greentechhub-ui's login page by default ([#31](https://github.com/GreenMachine582/greentechhub-fastapi/issues/31)) ([2a0658a](https://github.com/GreenMachine582/greentechhub-fastapi/commit/2a0658afb5853fc21b3e4c961fbc0cb2dda69a72))
+* **exceptions:** honour core's status hint and BadRequestError ([#27](https://github.com/GreenMachine582/greentechhub-fastapi/issues/27)) ([0fe7707](https://github.com/GreenMachine582/greentechhub-fastapi/commit/0fe7707f9f0c03fe513d772b9edb0f42b8c3e176))
+* **exceptions:** register_api_error_handlers for /api envelopes ([#28](https://github.com/GreenMachine582/greentechhub-fastapi/issues/28)) ([3780da6](https://github.com/GreenMachine582/greentechhub-fastapi/commit/3780da669430a2debe66b0c8653559570ea32d43))
+* **query:** JSON filter groups ([#30](https://github.com/GreenMachine582/greentechhub-fastapi/issues/30)) ([9cf4dfd](https://github.com/GreenMachine582/greentechhub-fastapi/commit/9cf4dfd7e8b42a33e205410faf9b7cc15f1da7ab))
+* **settings:** the opt-in site banner ([#29](https://github.com/GreenMachine582/greentechhub-fastapi/issues/29)) ([0636cb6](https://github.com/GreenMachine582/greentechhub-fastapi/commit/0636cb66a397bdace30f2f6efd1ba0a2533907b9))
+
 ## [0.10.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.9.0...v0.10.0) (2026-10-02)
 
 
