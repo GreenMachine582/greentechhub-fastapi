@@ -201,6 +201,23 @@ processor, turns that into greentechhub-ui's optional template keys:
 | `theme_mode` | signed in, and `ui.theme` is registered |
 | `theme_save_url`, `user_menu_items` (Settings) | signed in, and `views` were mounted |
 | `logout_url` | signed in, and `logout_url` was given |
+| `site_banners` | core's `site_banner_settings()` is registered and the message isn't empty: any visitor, signed in or not |
+
+**Site banner.** Register core's banner settings and every page shows the message above the navbar once someone sets
+it, for example in Settings › App:
+
+```python
+from greentechhub_core.settings.builtins import USER_PREFERENCES, site_banner_settings
+
+registry = SettingsRegistry([*USER_PREFERENCES, *site_banner_settings(edit_permission="settings.manage")])
+register_settings(app, settings, registry=registry, store=store, views=SettingsViews(templates=templates),
+                  manage_permission="settings.manage")
+```
+
+`settings_context` passes it as greentechhub-ui's `site_banners`: `[{"message", "tone", "id": "site"}]`. The tone
+defaults to `warn`, and the fixed id means a dismissed banner shows again when its message changes. An `env` passed to
+`register_settings` (e.g. `registry.env_overrides()`) applies too, so a banner can be put up without the UI. A service that builds its own `site_banners` should merge them,
+since a later context processor's key replaces this one's.
 
 **The page (`SettingsViews`).**
 
