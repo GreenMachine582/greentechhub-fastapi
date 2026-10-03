@@ -63,10 +63,12 @@ class LoginViews(ABC):
     """
 
     #: Template name resolved against the Jinja2Templates instance passed to
-    #: __init__ — the service owns the actual template file (its markup,
-    #: its own extends of a shared base shell if it has one). Rendered with
-    #: {"error": "..."} on a failed login, {} otherwise.
-    login_template: str = "login.html"
+    #: __init__. Defaults to greentechhub-ui's ready-made sign-in page (ui
+    #: v0.14+; this package still doesn't import ui), which renders exactly
+    #: this context: {"login_url"} on GET, plus {"error", "user_id"} after a
+    #: failed login (the user ID is kept so it needn't be retyped; the
+    #: password never is). Set your own template name to keep a custom page.
+    login_template: str = "login_page.html"
 
     #: Where a successful login redirects to — or, when the service registered
     #: core's landing_page_setting, the fallback if it can't be resolved.
@@ -102,7 +104,9 @@ class LoginViews(ABC):
         return router
 
     async def _login_form(self, request: Request):
-        return self._templates.TemplateResponse(request, self.login_template, {})
+        return self._templates.TemplateResponse(
+            request, self.login_template, {"login_url": self.login_url}
+        )
 
     async def _login_submit(
         self, request: Request, user_id: str = Form(...), password: str = Form(...)
@@ -112,7 +116,11 @@ class LoginViews(ABC):
             return self._templates.TemplateResponse(
                 request,
                 self.login_template,
-                {"error": "Incorrect user ID or password"},
+                {
+                    "login_url": self.login_url,
+                    "error": "Incorrect user ID or password",
+                    "user_id": user_id,
+                },
                 status_code=401,
             )
 

@@ -57,7 +57,20 @@ router = MyLoginViews(
 app.include_router(router)
 ```
 
-`LoginViews` owns rendering `login_template` (a template name resolved against the `Jinja2Templates` instance you pass in — the service supplies the actual file), minting the session JWT via the `identity_provider` you construct and pass in, and setting/clearing the cookie. Note it's the caller's job to build that provider — same precedent as `register_auth(app, settings)` reading `AUTH_ADAPTER` and choosing/constructing the right one itself, rather than a shared class hardcoding `DevelopmentIdentityProvider` internally. It deliberately never touches a database or session itself either — `authenticate()` is a plain async method, not a route parameter, so it never goes through `Depends()`. That's what `resolve_dependency(app, dependency)` (`greentechhub_fastapi.auth.resolve_dependency`) is for: it calls an async-generator-shaped dependency (e.g. a service's own `get_session`) the way FastAPI would, honoring whatever's in `app.dependency_overrides` — so a subclass's `authenticate()` still gets a test DB substituted in tests, the same as any `Depends(get_session)` route already does — without a subclass having to hand-roll that lookup itself. `login_template`/`redirect_url`/`login_url` are overridable class attributes for services whose routes/branding don't match the defaults. When the service registers greentechhub-core's `landing_page_setting` through `register_settings`, a successful login lands on the user's chosen page instead, and `redirect_url` is the fallback (see [docs/registration.md](registration.md#settings)).
+`LoginViews` owns rendering `login_template` (a template name resolved against the `Jinja2Templates` instance you pass in), minting the session JWT via the `identity_provider` you construct and pass in, and setting/clearing the cookie. Note it's the caller's job to build that provider — same precedent as `register_auth(app, settings)` reading `AUTH_ADAPTER` and choosing/constructing the right one itself, rather than a shared class hardcoding `DevelopmentIdentityProvider` internally. It deliberately never touches a database or session itself either — `authenticate()` is a plain async method, not a route parameter, so it never goes through `Depends()`. That's what `resolve_dependency(app, dependency)` (`greentechhub_fastapi.auth.resolve_dependency`) is for: it calls an async-generator-shaped dependency (e.g. a service's own `get_session`) the way FastAPI would, honoring whatever's in `app.dependency_overrides` — so a subclass's `authenticate()` still gets a test DB substituted in tests, the same as any `Depends(get_session)` route already does — without a subclass having to hand-roll that lookup itself. `login_template`/`redirect_url`/`login_url` are overridable class attributes for services whose routes/branding don't match the defaults. When the service registers greentechhub-core's `landing_page_setting` through `register_settings`, a successful login lands on the user's chosen page instead, and `redirect_url` is the fallback (see [docs/registration.md](registration.md#settings)).
+
+**The login page.** `login_template` defaults to `"login_page.html"`, greentechhub-ui's ready-made sign-in screen
+(ui v0.14+): no app navbar, the brand above a card, the theme toggle and a footer. Mount greentechhub-ui's templates
+(`greentechhub_ui.install(templates.env, ...)`) and there's nothing to write. `LoginViews` passes `login_url` (the
+form's action) on every render, plus `error` and the submitted `user_id` after a failed login, so the user ID stays
+filled in and focus moves to the password. The password is never sent back. The page's other options
+(`login_title`, `login_subtitle`, `login_help`, `login_links`) can be set by overriding the template or the views'
+render methods. Before v0.11 the default was `"login.html"`; to keep a page of your own:
+
+```python
+class MyLoginViews(LoginViews):
+    login_template = "login.html"
+```
 
 ## Requiring a login on page routes
 
