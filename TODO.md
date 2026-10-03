@@ -8,11 +8,6 @@
 
 ## 🗺️ Milestones
 
-### Settings & permissions
-Shipped: #5 (`register_permissions`), #9 (`register_settings`, `SettingsViews`), #11 (`RoleAdminViews`), #20
-(secret settings: `cipher=`, write-only saves, `get_secret`) and #21 (the landing-page redirect after login, acting
-on core #14's setting). Nothing here is open; releases next: ui v0.13.0 and fastapi v0.10.0 (core v0.8.0 is out).
-
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it
 - [ ] PyFinBot's greenfield build fully on it

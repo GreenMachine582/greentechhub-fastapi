@@ -1,5 +1,6 @@
 from greentechhub_core.types import (
     ApplicationError,
+    BadRequestError,
     ConflictError,
     ForbiddenError,
     NotFoundError,
@@ -55,3 +56,32 @@ def test_render_error_body_details_defaults_to_none():
     exc = NotFoundError("missing")
     body = render_error_body(exc)
     assert body["details"] is None
+
+
+def test_status_code_for_bad_request_error_is_400():
+    assert status_code_for(BadRequestError("unparseable id")) == 400
+
+
+def test_an_errors_own_status_hint_wins_over_its_type():
+    assert status_code_for(ApplicationError("mailbox down", status_code=503)) == 503
+    assert status_code_for(NotFoundError("gone", status_code=410)) == 410
+
+
+def test_a_subclass_class_level_hint_is_honoured():
+    class UpstreamError(ApplicationError):
+        code = "upstream_failed"
+        status_code = 502
+
+    assert status_code_for(UpstreamError("down")) == 502
+    assert status_code_for(UpstreamError("busy", status_code=503)) == 503
+
+
+def test_an_out_of_range_hint_falls_back_to_the_type_mapping():
+    for bad in (99, 600, 0, -1):
+        assert status_code_for(NotFoundError("missing", status_code=bad)) == 404, bad
+    assert status_code_for(ConflictError("dup", status_code=True)) == 409  # a bool isn't a status
+
+
+def test_no_hint_keeps_the_type_mapping():
+    assert NotFoundError("missing").status_code is None
+    assert status_code_for(NotFoundError("missing")) == 404

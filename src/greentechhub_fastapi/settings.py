@@ -48,7 +48,11 @@ from greentechhub_core.settings import (
     SettingScope,
     SettingType,
 )
-from greentechhub_core.settings.builtins import LANDING_PAGE_KEY
+from greentechhub_core.settings.builtins import (
+    LANDING_PAGE_KEY,
+    SITE_BANNER_KEY,
+    SITE_BANNER_TONE_KEY,
+)
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from greentechhub_fastapi.auth.dependency import get_current_user
@@ -189,13 +193,23 @@ async def landing_url(request: Request, identity: Identity | None, *, fallback: 
 def settings_context(request: Request) -> dict[str, Any]:
     """Jinja2Templates context processor for greentechhub-ui's optional
     keys. Empty when the middleware didn't run (JSON, static), so it's safe
-    on every template."""
+    on every template.
+
+    With core's site_banner_settings() in the registry, a non-empty banner
+    message becomes greentechhub-ui's `site_banners` on every page, signed
+    in or not (id "site", so a dismissal is remembered per message). A
+    service that builds its own `site_banners` too should merge them: a
+    later context processor's key replaces this one's."""
     if not getattr(request.state, _LOADED, False):
         return {}
     config = get_settings_config(request.app)
     user = getattr(request.state, _USER)
     effective = getattr(request.state, _EFFECTIVE)
     context: dict[str, Any] = {"current_user": user, "user_settings": effective}
+    if SITE_BANNER_KEY in config.settings.registry:
+        if message := str(effective.get(SITE_BANNER_KEY) or "").strip():
+            tone = effective.get(SITE_BANNER_TONE_KEY) or "warn"
+            context["site_banners"] = [{"message": message, "tone": tone, "id": "site"}]
     granted = getattr(request.state, _GRANTED_STATE_KEY, None)
     if granted is not None:
         context["granted"] = granted

@@ -24,13 +24,20 @@ one, deliberately minimal:
         executes the Filter against a real data source, same rationale as
         Filter.value's own "Any" typing.
 
-Both default to None/absent -> [], matching PageRequest's own field defaults.
-OR-groups/nesting are explicitly out of scope: PageRequest.filters is a flat,
-implicitly-AND-ed list per its own docstring, so there's no richer shape to
-parse into. A filter/sort value containing a literal "," is a known, documented
-limitation of this minimal format, not something this module tries to escape —
-a service needing that should build Filter/Sort objects programmatically instead
-of via the query string.
+  filters=<JSON>  (parse_filter_json)
+    For what the flat string can't say: AND/OR groups (core's FilterGroup,
+    v0.9), and values with commas or real types. A JSON list of clauses
+    (AND-ed) or one clause; a clause is a leaf {"field", "op", "value"} or a
+    group {"and": [...]} / {"or": [...]}, nested up to MAX_FILTER_DEPTH. `op`
+    is an Operator value or one of the symbol aliases ==, !=, >, >=, <, <=
+    (the sqlalchemy-filters spec's). Values keep their JSON types, so numbers
+    stay numbers; in/not_in need a list, is_null a bool. No NOT group: negate
+    per clause (ne, not_in, is_null false), as core does.
+
+All default to None/absent -> [], matching PageRequest's own field defaults.
+The flat `filter` string stays flat; a value containing a literal "," is a
+known limitation of it (use `filters`, or build Filter/Sort objects
+programmatically).
 
 Malformed input (bad clause shape, unknown operator, non-bool is_null value, an
 empty in/not_in list) raises a plain ValueError — this file stays fastapi-free
@@ -38,7 +45,10 @@ so it's testable without an app; the fastapi-touching layer (params.py) is
 responsible for turning that into an HTTP-visible error.
 """
 
-from greentechhub_core.query.types import Filter, Operator, Sort
+import json
+from typing import Any
+
+from greentechhub_core.query.types import Filter, FilterGroup, Operator, Sort
 
 _LIST_OPERATORS = {Operator.IN, Operator.NOT_IN}
 
@@ -91,3 +101,53 @@ def _parse_filter_value(operator: Operator, raw_value: str) -> str | list[str] |
             raise ValueError(f"is_null filter value must be true/false, got {raw_value!r}")
         return lowered == "true"
     return raw_value
+
+
+#: How deep and/or groups may nest in parse_filter_json — enough for a query
+#: builder's all/any with sub-groups, small enough to bound a hostile request.
+MAX_FILTER_DEPTH = 5
+
+_OPERATOR_ALIASES = {"==": "eq", "!=": "ne", ">": "gt", ">=": "gte", "<": "lt", "<=": "lte"}
+
+
+def parse_filter_json(raw: str | None) -> list[Filter | FilterGroup]:
+    """Parse the JSON `filters` form into a list of Filter / FilterGroup
+    (AND-ed, as PageRequest.filters is). See the module docstring."""
+    if raw is None or not raw.strip():
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"filters is not valid JSON: {exc.msg}") from None
+    clauses = data if isinstance(data, list) else [data]
+    return [_parse_clause(c, depth=1) for c in clauses]
+
+
+def _parse_clause(node: Any, *, depth: int) -> Filter | FilterGroup:
+    if not isinstance(node, dict):
+        raise ValueError(f"a filter clause must be an object, got {node!r}")
+    if "and" in node or "or" in node:
+        if len(node) != 1:
+            raise ValueError(f"a filter group has exactly one key, and/or: {node!r}")
+        if depth >= MAX_FILTER_DEPTH:
+            raise ValueError(f"filter groups nest at most {MAX_FILTER_DEPTH} deep")
+        mode, items = next(iter(node.items()))
+        if not isinstance(items, list):
+            raise ValueError(f'"{mode}" takes a list of clauses')
+        children = tuple(_parse_clause(i, depth=depth + 1) for i in items)
+        return FilterGroup(mode=mode, filters=children)
+    if "not" in node:
+        raise ValueError('"not" groups are not supported: negate per clause (ne, not_in, is_null)')
+    if set(node) != {"field", "op", "value"}:
+        raise ValueError(f'a filter clause is {{"field", "op", "value"}}, got {sorted(node)}')
+    field, raw_op, value = node["field"], node["op"], node["value"]
+    if not isinstance(field, str) or not field:
+        raise ValueError(f"invalid filter field: {field!r}")
+    if not isinstance(raw_op, str):
+        raise ValueError(f"invalid filter op: {raw_op!r}")
+    operator = Operator(_OPERATOR_ALIASES.get(raw_op, raw_op))
+    if operator in _LIST_OPERATORS and not isinstance(value, list):
+        raise ValueError(f"{operator} takes a list, got {value!r}")
+    if operator is Operator.IS_NULL and not isinstance(value, bool):
+        raise ValueError(f"is_null takes true/false, got {value!r}")
+    return Filter(field=field, operator=operator, value=value)

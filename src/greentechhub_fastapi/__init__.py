@@ -9,8 +9,9 @@ matching docs/registration.md's own usage example:
         register_exception_handlers, register_auth,
     )
 
-register_exception_handlers comes from greentechhub_fastapi.exceptions rather
-than greentechhub_fastapi.registration — it has no registration/*.py wrapper,
+register_exception_handlers (and register_api_error_handlers) come from
+greentechhub_fastapi.exceptions rather than greentechhub_fastapi.registration —
+neither has a registration/*.py wrapper,
 since docs/exceptions.md's own usage example imports it directly from its
 module, unlike register_health/register_core/register_logging/register_auth.
 
@@ -42,7 +43,7 @@ get_settings_service / get_effective_settings dependencies live in
 greentechhub_fastapi.settings.
 """
 
-from greentechhub_fastapi.exceptions import register_exception_handlers
+from greentechhub_fastapi.exceptions import register_api_error_handlers, register_exception_handlers
 from greentechhub_fastapi.registration import (
     register_auth,
     register_core,
@@ -55,6 +56,7 @@ from greentechhub_fastapi.registration import (
 )
 
 __all__ = [
+    "register_api_error_handlers",
     "register_auth",
     "register_core",
     "register_events",

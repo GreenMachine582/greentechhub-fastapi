@@ -79,3 +79,40 @@ def test_malformed_filter_returns_422_with_detail():
     app = _build_app()
     response = asyncio.run(_get(app, params={"filter": "status:matches:active"}))
     assert response.status_code == 422
+
+
+# The JSON `filters` param: and/or groups alongside the flat `filter` string
+
+
+def _shape(clause):
+    if hasattr(clause, "mode"):
+        return {clause.mode: [_shape(c) for c in clause.filters]}
+    return [clause.field, str(clause.operator), clause.value]
+
+
+def _groups_app():
+    app = FastAPI()
+
+    @app.get("/items")
+    async def list_items(params: PageParams = Depends()):
+        return [_shape(c) for c in params.to_page_request().filters]
+
+    return app
+
+
+def test_json_filters_and_the_flat_filter_combine():
+    filters = '[{"or": [{"field": "stock", "op": "eq", "value": 0}, ' \
+              '{"field": "name", "op": "contains", "value": "bolt"}]}]'
+    response = asyncio.run(_get(_groups_app(), params={"filter": "status:eq:active",
+                                                       "filters": filters}))
+    assert response.status_code == 200
+    assert response.json() == [
+        ["status", "eq", "active"],
+        {"or": [["stock", "eq", 0], ["name", "contains", "bolt"]]},
+    ]
+
+
+def test_malformed_json_filters_return_422_with_detail():
+    response = asyncio.run(_get(_groups_app(), params={"filters": '{"not": {}}'}))
+    assert response.status_code == 422
+    assert "not supported" in response.json()["detail"]

@@ -18,7 +18,11 @@ _USERS = {
 
 def _make_templates() -> Jinja2Templates:
     env = Environment(
-        loader=DictLoader({"login.html": "Log in{% if error %} - {{ error }}{% endif %}"})
+        loader=DictLoader({
+            "login_page.html": "Log in at {{ login_url }}{% if error %} - {{ error }}"
+                               " as {{ user_id }}{% endif %}",
+            "login.html": "Custom login{% if error %} - {{ error }}{% endif %}",
+        })
     )
     return Jinja2Templates(env=env)
 
@@ -107,3 +111,29 @@ def test_custom_redirect_and_login_url_are_respected():
     logout_response = asyncio.run(_post(app, "/logout"))
     assert logout_response.status_code == 303
     assert logout_response.headers["location"] == "/auth/login"
+
+
+def test_default_template_is_greentechhub_uis_login_page():
+    assert LoginViews.login_template == "login_page.html"
+    response = asyncio.run(_get(_build_app(), "/login"))
+    assert response.text == "Log in at /login"  # login_url in the context
+
+
+def test_failed_login_keeps_the_user_id_but_never_the_password():
+    response = asyncio.run(_post(_build_app(), "/login",
+                                 data={"user_id": "alice", "password": "wrong-pw"}))
+    assert response.status_code == 401
+    assert response.text == "Log in at /login - Incorrect user ID or password as alice"
+    assert "wrong-pw" not in response.text
+
+
+def test_login_url_follows_where_the_views_are_mounted():
+    app = _build_app(login_url="/auth/sign-in")
+    assert asyncio.run(_get(app, "/auth/sign-in")).text == "Log in at /auth/sign-in"
+
+
+def test_a_custom_template_still_works():
+    app = _build_app(login_template="login.html")
+    assert asyncio.run(_get(app, "/login")).text == "Custom login"
+    failed = asyncio.run(_post(app, "/login", data={"user_id": "alice", "password": "x"}))
+    assert failed.text == "Custom login - Incorrect user ID or password"
