@@ -4,6 +4,7 @@ import httpx
 from fastapi import FastAPI
 from greentechhub_core.types import (
     ApplicationError,
+    BadRequestError,
     ConflictError,
     ForbiddenError,
     NotFoundError,
@@ -41,6 +42,14 @@ def _build_app():
     @app.get("/forbidden")
     async def raise_forbidden():
         raise ForbiddenError("not allowed")
+
+    @app.get("/bad-request")
+    async def raise_bad_request():
+        raise BadRequestError("Invalid stock identifier", code="invalid_stock_id")
+
+    @app.get("/upstream")
+    async def raise_upstream():
+        raise ApplicationError("Mailbox unreachable", code="email_sync_failed", status_code=503)
 
     return app
 
@@ -95,3 +104,23 @@ def test_forbidden_error_returns_403():
     response = asyncio.run(_get(app, "/forbidden"))
     assert response.status_code == 403
     assert response.json()["code"] == "forbidden"
+
+
+def test_bad_request_error_returns_400():
+    response = asyncio.run(_get(_build_app(), "/bad-request"))
+    assert response.status_code == 400
+    assert response.json() == {
+        "code": "invalid_stock_id",
+        "message": "Invalid stock identifier",
+        "details": None,
+    }
+
+
+def test_an_errors_status_hint_sets_the_response_status():
+    response = asyncio.run(_get(_build_app(), "/upstream"))
+    assert response.status_code == 503
+    assert response.json() == {
+        "code": "email_sync_failed",
+        "message": "Mailbox unreachable",
+        "details": None,
+    }
