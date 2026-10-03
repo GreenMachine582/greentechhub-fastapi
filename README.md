@@ -21,7 +21,7 @@ The FastAPI/Starlette-specific adapter package: turns `greentechhub-core`'s fram
 | `auth` | FastAPI `Depends(get_current_user)` built on `greentechhub-core`'s `IdentityProvider`; ships `local` (dev) and `forward_auth` (Authentik) configurations, selected via one setting | [docs/auth.md](docs/auth.md) |
 | `health` | A router exposing `/health`/`/health/ready`, running `greentechhub-core`'s health checks against this service's actual dependencies | [docs/health.md](docs/health.md) |
 | `query` | Converts FastAPI `Query(...)` parameters into `greentechhub-core`'s `PageRequest`/`Filter`/`Sort`, and renders results as a `Page` envelope | [docs/query.md](docs/query.md) |
-| `exception_handlers` | Registers handlers translating `greentechhub-core`'s exception types into the shared JSON error envelope (API routes) or an HTML error page (web routes) | [docs/exceptions.md](docs/exceptions.md) |
+| `exception_handlers` | Registers handlers translating `greentechhub-core`'s exception types into the shared JSON error envelope (API routes) or an HTML error page (web routes); `register_api_error_handlers` gives FastAPI's own errors under an API prefix the same envelope | [docs/exceptions.md](docs/exceptions.md) |
 | `flash` | Cookie/session-based one-time messages, producing `greentechhub-core`'s `FlashMessage` type | [docs/modules.md](docs/modules.md) |
 | `events` | Startup/shutdown hooks wiring `greentechhub-core`'s event publisher into the FastAPI app lifecycle | [docs/modules.md](docs/modules.md) |
 | `dependencies` | Small `Depends`-ready helpers beyond auth (current identity, feature-flag lookups, pagination params) | [docs/modules.md](docs/modules.md#dependencies) |
