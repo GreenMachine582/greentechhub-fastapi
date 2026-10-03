@@ -21,7 +21,7 @@ from fastapi import HTTPException, Query
 from fastapi_pagination import Params
 from greentechhub_core.query.types import PageRequest
 
-from greentechhub_fastapi.query.parsing import parse_filters, parse_sort
+from greentechhub_fastapi.query.parsing import parse_filter_json, parse_filters, parse_sort
 
 
 class PageParams(Params):
@@ -31,18 +31,26 @@ class PageParams(Params):
     filter: str | None = Query(
         None, description='Comma-separated "field:operator:value" clauses.'
     )
+    filters: str | None = Query(
+        None,
+        description='JSON filter clauses, AND-ed: {"field", "op", "value"} leaves and '
+        '{"and": [...]} / {"or": [...]} groups.',
+    )
 
     def to_page_request(self) -> PageRequest:
         """Translate this request's page/size/sort/filter into a PageRequest.
 
-        A malformed sort/filter string raises HTTPException(422) with the
+        `filter` (the flat string) and `filters` (JSON, with and/or groups)
+        may both be given; their clauses are AND-ed together.
+
+        A malformed sort/filter/filters value raises HTTPException(422) with the
         underlying ValueError's message as `detail` — page/size are already
         validated natively by the inherited Params fields' ge/le constraints,
         so no equivalent handling is needed for them here.
         """
         try:
             sort = parse_sort(self.sort)
-            filters = parse_filters(self.filter)
+            filters = [*parse_filters(self.filter), *parse_filter_json(self.filters)]
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return PageRequest(page=self.page, size=self.size, sort=sort, filters=filters)

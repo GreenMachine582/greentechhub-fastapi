@@ -34,3 +34,40 @@ async def stock_rows(request: Request, q: str = "",
 
 - `page_params(default_size=50, max_size=100)` — a `Depends()`-ready builder that parses only `page`/`size`, with a per-endpoint default size read at call time. Pages take their own named filter params rather than `PageParams`' generic `sort`/`filter` strings.
 - `next_page_url(path, page, filters)` — the next page's URL with the current filters carried over (empty ones dropped), or `None` on the last page.
+
+## Filter groups (`filters=`, JSON)
+
+`PageParams` reads two filter params, and their clauses are AND-ed together:
+
+- `filter=status:eq:active,stock:gt:0` — the flat string form: field, operator and value, AND-ed. Values are text.
+- `filters=<JSON>` — for what the string can't say: AND/OR groups (greentechhub-core v0.9's `FilterGroup`), and
+  values with commas or real types. It's a list of clauses (AND-ed) or one clause. A clause is a leaf
+  `{"field", "op", "value"}` or a group `{"and": [...]}` / `{"or": [...]}`, and groups nest:
+
+```text
+?filters=[{"field":"category","op":"in","value":["Sensor","Cable"]},
+          {"or":[{"field":"stock","op":"eq","value":0},{"field":"name","op":"contains","value":"bolt"}]}]
+```
+
+- `op` is a core `Operator` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `not_in`, `contains`, `starts_with`,
+  `ends_with`, `is_null`), or one of the symbol aliases `==`, `!=`, `>`, `>=`, `<`, `<=` used by the
+  `sqlalchemy-filters` spec.
+- Values keep their JSON types, so `5` stays a number. `in` / `not_in` take a list; `is_null` takes `true`/`false`.
+- There's no `not` group: negate per clause (`ne`, `not_in`, `is_null: false`), as core does. Groups nest at most
+  `MAX_FILTER_DEPTH` (5) deep. Anything malformed is a 422 with the reason in `detail`.
+
+The result goes straight into greentechhub-core's SQLAlchemy helpers, with the field allow-list applied there:
+
+```python
+from greentechhub_core.query import to_envelope
+from greentechhub_core.sqlalchemy import page
+
+@router.get("/stocks")
+async def list_stocks(params: PageParams = Depends(), session=Depends(get_session)):
+    result = await page(session, select(Stock), params.to_page_request(), ALLOWED,
+                        default_sort=[Sort(field="id")])
+    return to_envelope(result)
+```
+
+`parse_filter_json(raw)` is exported from `greentechhub_fastapi.query` for routes that read the JSON elsewhere,
+such as a form field.
