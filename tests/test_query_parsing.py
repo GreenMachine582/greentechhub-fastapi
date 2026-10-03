@@ -1,7 +1,14 @@
-import pytest
-from greentechhub_core.query.types import Filter, Sort
+import json
 
-from greentechhub_fastapi.query.parsing import parse_filters, parse_sort
+import pytest
+from greentechhub_core.query.types import Filter, FilterGroup, Operator, Sort
+
+from greentechhub_fastapi.query.parsing import (
+    MAX_FILTER_DEPTH,
+    parse_filter_json,
+    parse_filters,
+    parse_sort,
+)
 
 
 def test_parse_sort_none_returns_empty_list():
@@ -104,3 +111,78 @@ def test_parse_filters_unknown_operator_raises():
 def test_parse_filters_malformed_clause_shape_raises(raw):
     with pytest.raises(ValueError):
         parse_filters(raw)
+
+
+# parse_filter_json — the JSON `filters` form, with and/or groups
+
+
+def _leaf(field, op, value):
+    return {"field": field, "op": op, "value": value}
+
+
+@pytest.mark.parametrize("raw", [None, "", "  ", "[]"])
+def test_filter_json_empty_is_no_filters(raw):
+    assert parse_filter_json(raw) == []
+
+
+def test_filter_json_single_clause_or_list():
+    one = parse_filter_json(json.dumps(_leaf("stock", "gte", 5)))
+    # The number stays a number.
+    assert one == [Filter(field="stock", operator=Operator.GTE, value=5)]
+    both = [_leaf("stock", "gte", 5), _leaf("name", "contains", "a,b")]
+    many = parse_filter_json(json.dumps(both))
+    assert [f.field for f in many] == ["stock", "name"] and many[1].value == "a,b"
+
+
+def test_filter_json_nested_groups():
+    raw = json.dumps([
+        _leaf("category", "in", ["Sensor", "Cable"]),
+        {"or": [_leaf("stock", "eq", 0), {"and": [_leaf("name", "starts_with", "x"),
+                                                  _leaf("note", "is_null", False)]}]},
+    ])
+    parsed = parse_filter_json(raw)
+    assert parsed[0] == Filter(field="category", operator=Operator.IN, value=["Sensor", "Cable"])
+    group = parsed[1]
+    assert isinstance(group, FilterGroup) and group.mode == "or"
+    inner = group.filters[1]
+    assert inner.mode == "and"
+    assert inner.filters[1] == Filter(field="note", operator=Operator.IS_NULL, value=False)
+
+
+@pytest.mark.parametrize(
+    ("alias", "operator"),
+    [("==", Operator.EQ), ("!=", Operator.NE), (">", Operator.GT), (">=", Operator.GTE),
+     ("<", Operator.LT), ("<=", Operator.LTE)],
+)
+def test_filter_json_symbol_aliases(alias, operator):
+    assert parse_filter_json(json.dumps(_leaf("stock", alias, 1)))[0].operator is operator
+
+
+@pytest.mark.parametrize(
+    ("raw", "message"),
+    [
+        ("{not json", "not valid JSON"),
+        ('"stock"', "must be an object"),
+        (json.dumps(_leaf("stock", "matches", 1)), "matches"),
+        (json.dumps({"field": "stock", "op": "eq"}), '"field", "op", "value"'),
+        (json.dumps({**_leaf("stock", "eq", 1), "extra": 1}), '"field", "op", "value"'),
+        (json.dumps({"field": "", "op": "eq", "value": 1}), "invalid filter field"),
+        (json.dumps({"not": _leaf("stock", "eq", 1)}), "not supported"),
+        (json.dumps({"and": [], "or": []}), "exactly one key"),
+        (json.dumps({"or": _leaf("stock", "eq", 1)}), "takes a list"),
+        (json.dumps(_leaf("stock", "in", 1)), "takes a list"),
+        (json.dumps(_leaf("note", "is_null", "true")), "true/false"),
+    ],
+)
+def test_filter_json_rejects_malformed_input(raw, message):
+    with pytest.raises(ValueError, match=message):
+        parse_filter_json(raw)
+
+
+def test_filter_json_nesting_is_bounded():
+    node = _leaf("stock", "eq", 1)
+    for _ in range(MAX_FILTER_DEPTH - 1):
+        node = {"and": [node]}
+    assert parse_filter_json(json.dumps(node))  # at the limit: fine
+    with pytest.raises(ValueError, match="nest at most"):
+        parse_filter_json(json.dumps({"and": [node]}))
