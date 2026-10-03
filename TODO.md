@@ -8,11 +8,6 @@
 
 ## 🗺️ Milestones
 
-### From the PyFinBot review
-Generic pieces PyFinBot built for itself, to move here (opt-in) so it can delete them:
-- [ ] `LoginViews.login_template` defaults to greentechhub-ui's `login_page.html` (after ui ships it); apps can
-  still override it
-
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it
 - [ ] PyFinBot's greenfield build fully on it

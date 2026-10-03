@@ -37,7 +37,7 @@ def _app(role_settings, *, registry=None, store=None, settings=True, **attrs) ->
             registry=registry or SettingsRegistry([LANDING]),
             store=store or InMemorySettingsStore(),
         )
-    templates = Jinja2Templates(env=Environment(loader=DictLoader({"login.html": "Log in"})))
+    templates = Jinja2Templates(env=Environment(loader=DictLoader({"login_page.html": "Log in"})))
     views = _Login(templates=templates,
                    identity_provider=DevelopmentIdentityProvider(secret_key="test-secret"))
     for key, value in attrs.items():
