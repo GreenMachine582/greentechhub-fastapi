@@ -15,7 +15,7 @@ from greentechhub_core.settings import (
     SettingsRegistry,
     SettingType,
 )
-from greentechhub_core.settings.builtins import PAGE_SIZE, THEME
+from greentechhub_core.settings.builtins import PAGE_SIZE, THEME, site_banner_settings
 
 from greentechhub_fastapi import register_permissions, register_settings
 from greentechhub_fastapi.settings import (
@@ -307,3 +307,61 @@ def test_register_after_start_fails(role_settings, templates):
     _run(app, _get("/home"))  # builds the middleware stack
     with pytest.raises(RuntimeError, match="before the app starts"):
         register_settings(app, role_settings, registry=_registry(), store=InMemorySettingsStore())
+
+
+# ── site banner (core's site_banner_settings) ──────────────────────────────
+
+BANNER_PAGE = ("BANNERS {% for b in site_banners|default([]) %}"
+               "{{ b.message }}|{{ b.tone }}|{{ b.id }};{% else %}none{% endfor %}")
+
+
+def _banner_app(role_settings, templates, tmp_path, registry, store):
+    (tmp_path / "banner.html").write_text(BANNER_PAGE, encoding="utf-8")
+    app = build_app(role_settings)
+    register_permissions(app, role_settings, roles=ROLES)
+    register_settings(app, role_settings, registry=registry, store=store,
+                      views=SettingsViews(templates=templates), manage_permission="settings.manage")
+
+    @app.get("/banner")
+    async def banner(request: Request):
+        return templates.TemplateResponse(request, "banner.html", {})
+
+    @app.get("/api/banner")
+    async def api_banner(request: Request):
+        return settings_context(request)
+
+    return app
+
+
+def test_site_banner_shows_on_every_page_once_set(role_settings, templates, tmp_path):
+    store = InMemorySettingsStore()
+    registry = SettingsRegistry([THEME, *site_banner_settings(edit_permission="settings.manage")])
+    app = _banner_app(role_settings, templates, tmp_path, registry, store)
+    assert _run(app, _get("/banner")).text == "BANNERS none"  # nothing set yet
+
+    saved = _run(app, _post("/settings/app", {"site.banner": " Maintenance at 9pm ",
+                                              "site.banner_tone": "bad"}), subject="root")
+    assert saved.status_code == 200
+    expected = "BANNERS Maintenance at 9pm|bad|site;"
+    assert _run(app, _get("/banner")).text == expected  # anonymous, e.g. the login page
+    assert _run(app, _get("/banner"), subject="alice").text == expected
+
+    # Whitespace only is no banner; JSON requests never load the page context.
+    _run(app, _post("/settings/app", {"site.banner": "   "}), subject="root")
+    assert _run(app, _get("/banner")).text == "BANNERS none"
+    assert _run(app, _get("/api/banner", headers={"Accept": "application/json"})).json() == {}
+
+
+def test_site_banner_tone_defaults_to_warn(role_settings, templates, tmp_path):
+    banner_only, _ = site_banner_settings()
+    store = InMemorySettingsStore()
+    store.set_sync(SettingScope.APP, None, "site.banner", "Heads up")
+    app = _banner_app(role_settings, templates, tmp_path, SettingsRegistry([banner_only]), store)
+    assert _run(app, _get("/banner")).text == "BANNERS Heads up|warn|site;"
+
+
+def test_no_site_banner_without_the_setting_registered(role_settings, templates, tmp_path):
+    store = InMemorySettingsStore()
+    store.set_sync(SettingScope.APP, None, "site.banner", "Stored but unregistered")
+    app = _banner_app(role_settings, templates, tmp_path, SettingsRegistry([THEME]), store)
+    assert _run(app, _get("/banner")).text == "BANNERS none"

@@ -12,9 +12,6 @@
 Generic pieces PyFinBot built for itself, to move here (opt-in) so it can delete them:
 - [ ] `LoginViews.login_template` defaults to greentechhub-ui's `login_page.html` (after ui ships it); apps can
   still override it
-- [ ] An opt-in admin site banner — core's setting definitions (message + tone) registered with
-  `register_settings`, plus a context processor that turns them into greentechhub-ui's `site_banners`. From
-  PyFinBot's `site_banners_context`
 
 ### v1.0 — Validated in production
 - [ ] BottleBot's retrofit fully on it
