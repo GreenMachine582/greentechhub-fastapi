@@ -41,6 +41,10 @@ un-re-exported.
 register_settings likewise; SettingsViews, settings_context and the
 get_settings_service / get_effective_settings dependencies live in
 greentechhub_fastapi.settings.
+
+register_notifications likewise; notify, NotificationViews,
+notifications_nav_item and get_notification_store live in
+greentechhub_fastapi.notifications.
 """
 
 from greentechhub_fastapi.exceptions import register_api_error_handlers, register_exception_handlers
@@ -51,6 +55,7 @@ from greentechhub_fastapi.registration import (
     register_flash,
     register_health,
     register_logging,
+    register_notifications,
     register_permissions,
     register_settings,
 )
@@ -64,6 +69,7 @@ __all__ = [
     "register_flash",
     "register_health",
     "register_logging",
+    "register_notifications",
     "register_permissions",
     "register_settings",
 ]
