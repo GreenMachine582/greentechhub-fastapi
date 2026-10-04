@@ -33,6 +33,7 @@ register_auth installed, and an admin can come from ROLE_BOOTSTRAP
 """
 
 import inspect
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -247,6 +248,17 @@ class SettingsViews:
 
     POST {url}/theme: the theme toggle's save (form field `theme`), 204.
 
+    Change password (opt-in): pass `change_password`, an async
+    (user, current, new) -> bool that returns False when `current` isn't
+    the user's password and otherwise stores the new one (hashing it is the
+    service's job, as with LoginViews). The page then shows a Password
+    section after Preferences, and POST {url}/password checks the fields
+    (current given; new at least min_password_length, different from
+    current, confirmed) before calling it: 422 with the section's errors,
+    or 200 with an empty section and a "Password changed" toast. Passwords
+    are never rendered back. Sessions already issued stay valid (they're
+    stateless JWTs).
+
     Templates default to greentechhub-ui's ready-made settings_page.html and
     settings_section.html; override the names to use your own.
     """
@@ -260,9 +272,18 @@ class SettingsViews:
     preferences_description: str = "Only you see these."
     app_title: str = "App"
     app_description: str = "These apply to everyone."
+    password_title: str = "Password"
+    password_description: str = "Change the password you sign in with."
+    min_password_length: int = 8
 
-    def __init__(self, *, templates: Jinja2Templates) -> None:
+    def __init__(
+        self,
+        *,
+        templates: Jinja2Templates,
+        change_password: Callable[[Identity, str, str], Awaitable[bool]] | None = None,
+    ) -> None:
         self._templates = templates
+        self._change_password = change_password
         self._page_identity = require_page_identity(self.login_url)
 
     def router(self) -> APIRouter:
@@ -287,6 +308,12 @@ class SettingsViews:
         router.add_api_route(f"{self.url}/preferences", save_preferences, methods=["POST"])
         router.add_api_route(f"{self.url}/app", save_app, methods=["POST"])
         router.add_api_route(f"{self.url}/theme", save_theme, methods=["POST"])
+        if self._change_password is not None:
+
+            async def change_password(request: Request, user: Identity = Depends(page_identity)):
+                return await self._save_password(request, user)
+
+            router.add_api_route(f"{self.url}/password", change_password, methods=["POST"])
         return router
 
     # sections
@@ -325,6 +352,8 @@ class SettingsViews:
         preferences = self._definitions(settings, "preferences")
         if preferences:
             sections.append(self._section("preferences", preferences, values))
+        if self._change_password is not None:
+            sections.append(self._password_section())
         if await self._can_manage(request, user):
             app_settings = self._definitions(settings, "app")
             if app_settings:
@@ -406,6 +435,57 @@ class SettingsViews:
                 await settings.reset_user(user, key)
             else:
                 await settings.set_user(user, key, value)
+
+    # change password
+
+    def _password_section(self, errors: dict[str, list[str]] | None = None) -> dict[str, Any]:
+        """The Password section: three write-only fields that greentechhub-ui's
+        settings templates render as empty password inputs (secret str
+        settings, duck-typed), never filled back in."""
+
+        def field(key: str, label: str, help_text: str = "") -> dict[str, Any]:
+            return {"key": key, "type": "str", "label": label, "default": "", "secret": True,
+                    "help_text": help_text}
+
+        return {
+            "id": "password",
+            "title": self.password_title,
+            "description": self.password_description,
+            "settings": [
+                field("current_password", "Current password"),
+                field("new_password", "New password",
+                      f"At least {self.min_password_length} characters."),
+                field("new_password_confirm", "Confirm new password"),
+            ],
+            "values": {},
+            "errors": errors,
+            "action": f"{self.url}/password",
+            "submit_label": "Change password",
+        }
+
+    async def _save_password(self, request: Request, user: Identity):
+        assert self._change_password is not None  # the route is only mounted with one
+        form = await request.form()
+        current = str(form.get("current_password") or "")
+        new = str(form.get("new_password") or "")
+        confirm = str(form.get("new_password_confirm") or "")
+        errors: dict[str, list[str]] = {}
+        if not current:
+            errors["current_password"] = ["Enter your current password."]
+        if len(new) < self.min_password_length:
+            errors["new_password"] = [f"Use at least {self.min_password_length} characters."]
+        elif new == current:
+            errors["new_password"] = ["Choose a password different from your current one."]
+        elif new != confirm:
+            errors["new_password_confirm"] = ["The passwords don't match."]
+        if not errors and not await self._change_password(user, current, new):
+            errors["current_password"] = ["That isn't your current password."]
+        if errors:
+            return self._render_section(request, self._password_section(errors), status_code=422)
+        return self._render_section(
+            request, self._password_section(),
+            headers={"HX-Trigger": _toast_trigger("Password changed", {})},
+        )
 
     def _render_section(self, request: Request, section: dict[str, Any], **kwargs):
         return self._templates.TemplateResponse(

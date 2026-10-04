@@ -227,12 +227,33 @@ since a later context processor's key replaces this one's.
 | `POST /settings/preferences` | coerce each field; 422 with the section and its errors, or save and return the section with a toast (plus `gth:theme` when the theme changed) |
 | `POST /settings/app` | the same for APP settings; 403 without `manage_permission` |
 | `POST /settings/theme` | the theme toggle's save (`theme=light\|dark`): 204, 401 anonymous, 422 invalid |
+| `POST /settings/password` | only with `change_password=`: change the signed-in user's password (below) |
 
 - A preference saved equal to what the user would get anyway (the app value, env override or default) resets their
   own value instead of storing it, so saving an untouched form doesn't pin today's defaults.
 - Subclass to change `url`, `login_url`, `title`, the section titles/descriptions, or `page_template` /
   `section_template` to use your own templates (they get `settings_sections` / `section`, see greentechhub-ui's
   docs/components.md).
+- **Change password** (opt-in): pass `change_password`, an async `(user, current, new) -> bool` that returns `False`
+  when `current` isn't the user's password and otherwise stores `new` (hashing it is yours, as with `LoginViews`).
+  The page then shows a Password section after Preferences. Its route first checks the fields: the current password
+  is given, the new one has at least `min_password_length` (8) characters, differs from the current one and is
+  confirmed. It then calls yours: 422 with the section's errors, or 200 with an empty section and a "Password
+  changed" toast. The fields are write-only secret fields, so greentechhub-ui's settings templates render them as
+  empty password inputs and nothing is filled back in. Sessions already issued stay valid (they're stateless JWTs).
+
+  ```python
+  async def change_password(user: Identity, current: str, new: str) -> bool:
+      async with resolve_dependency(app, get_session) as session:
+          row = await session.get(User, user.subject)
+          if row is None or not verify_password(current, row.password_hash):
+              return False
+          row.password_hash = hash_password(new)
+          await session.commit()
+      return True
+
+  views = SettingsViews(templates=templates, change_password=change_password)
+  ```
 - Dependencies for your own routes, in `greentechhub_fastapi.settings`: `get_settings_service` (the `Settings`),
   `get_effective_settings` (the current user's values, secrets as the marker) and `get_secret(key)` (a secret's
   plaintext).
