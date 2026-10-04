@@ -12,7 +12,6 @@ Cross-repo order (with greentechhub-core and greentechhub-ui): Accounts (M1) →
 consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.0.
 
 ### Accounts (M1)
-- [ ] Profile page — display name and email, shown in the user menu
 - [ ] CSRF tokens on the auth forms — opt-in on `LoginViews`/`RegisterViews`, passing `csrf_token` to the template
   and checking it on POST; needs greentechhub-ui's sign-in and sign-up pages to render the hidden field first (the
   rest of login hardening, throttling and one generic error, is done)

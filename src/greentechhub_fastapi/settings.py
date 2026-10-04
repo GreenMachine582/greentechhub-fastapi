@@ -21,7 +21,9 @@ registration.settings.register_settings, over greentechhub-core's Settings.
 - SettingsViews: the /settings page, its two section saves and the theme
   toggle's save endpoint, in LoginViews' style. It renders greentechhub-ui's
   settings_page.html / settings_section.html by default, passing data only:
-  nothing here imports greentechhub-ui.
+  nothing here imports greentechhub-ui. Opt-in sections: a Profile (the
+  user's display name and email, over the service's own Profile hooks) and
+  a Password change.
 
 Secret settings (core's Setting.secret) only ever reach a template or a
 JSON response as core's SECRET_SET marker (or None): core's effective()
@@ -35,7 +37,7 @@ register_auth installed, and an admin can come from ROLE_BOOTSTRAP
 """
 
 import inspect
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -70,6 +72,26 @@ THEME_KEY = "ui.theme"
 _LOADED = "gth_settings_loaded"
 _USER = "gth_settings_user"
 _EFFECTIVE = "gth_settings_effective"
+_PROFILE = "gth_settings_profile"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Profile:
+    """A user's profile as SettingsViews' Profile section edits it; an empty
+    string means not set. Where it's stored is the service's business."""
+
+    display_name: str = ""
+    email: str = ""
+
+
+class ProfileError(Exception):
+    """Raised by a `save_profile` hook for an expected refusal, e.g. an email
+    that's taken. `errors` maps fields ("display_name", "email") to their
+    messages; the section is shown again with them, status 422."""
+
+    def __init__(self, errors: Mapping[str, list[str]]) -> None:
+        super().__init__("; ".join(m for messages in errors.values() for m in messages))
+        self.errors = {field: list(messages) for field, messages in errors.items()}
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -80,6 +102,7 @@ class SettingsConfig:
     manage_permission: Permission | None
     logout_url: str | None
     url: str | None  # SettingsViews' mount path, when register_settings mounted them
+    load_profile: Callable[[Identity], Awaitable[Profile]] | None = None  # SettingsViews' hook
 
 
 def get_settings_config(app: Any) -> SettingsConfig:
@@ -140,6 +163,9 @@ class SettingsContextMiddleware:
                 user = await _resolve_user(request)
                 await _granted(request, user)
                 effective = await get_settings_service(request).effective(user)
+                load_profile = get_settings_config(request.app).load_profile
+                if user is not None and load_profile is not None:
+                    setattr(request.state, _PROFILE, await load_profile(user))
                 setattr(request.state, _USER, user)
                 setattr(request.state, _EFFECTIVE, effective)
                 setattr(request.state, _LOADED, True)
@@ -217,7 +243,11 @@ def settings_context(request: Request) -> dict[str, Any]:
     message becomes greentechhub-ui's `site_banners` on every page, signed
     in or not (id "site", so a dismissal is remembered per message). A
     service that builds its own `site_banners` too should merge them: a
-    later context processor's key replaces this one's."""
+    later context processor's key replaces this one's.
+
+    With SettingsViews' profile hooks, a signed-in user with a display name
+    also gets `user_display_name`, for the user menu to show instead of
+    their user ID."""
     if not getattr(request.state, _LOADED, False):
         return {}
     config = get_settings_config(request.app)
@@ -233,6 +263,9 @@ def settings_context(request: Request) -> dict[str, Any]:
         context["granted"] = granted
     if user is None:
         return context
+    profile = getattr(request.state, _PROFILE, None)
+    if profile is not None and profile.display_name:
+        context["user_display_name"] = profile.display_name
     has_theme = THEME_KEY in config.settings.registry
     if has_theme:
         context["theme_mode"] = effective.get(THEME_KEY)
@@ -276,6 +309,18 @@ class SettingsViews:
     are never rendered back. Sessions already issued stay valid (they're
     stateless JWTs).
 
+    Profile (opt-in): pass `load_profile`, an async (user) -> Profile, and
+    `save_profile`, an async (user, Profile) -> None, both over the
+    service's own users table. The page then opens with a Profile section
+    (display name and email), and POST {url}/profile strips and checks the
+    fields (a display name up to max_display_name_length, an email that
+    looks like an address or nothing) before calling save_profile: 422 with
+    the section's errors (also from a ProfileError it raises), or 200 with
+    the saved section and a "Profile saved" toast. register_settings hands
+    load_profile to the page-context middleware, which calls it once per
+    page request for a signed-in user, so keep it a cheap lookup; the
+    display name reaches templates as `user_display_name`.
+
     Templates default to greentechhub-ui's ready-made settings_page.html and
     settings_section.html; override the names to use your own.
     """
@@ -292,15 +337,24 @@ class SettingsViews:
     password_title: str = "Password"
     password_description: str = "Change the password you sign in with."
     min_password_length: int = 8
+    profile_title: str = "Profile"
+    profile_description: str = "How you appear to others."
+    max_display_name_length: int = 80
 
     def __init__(
         self,
         *,
         templates: Jinja2Templates,
         change_password: Callable[[Identity, str, str], Awaitable[bool]] | None = None,
+        load_profile: Callable[[Identity], Awaitable[Profile]] | None = None,
+        save_profile: Callable[[Identity, Profile], Awaitable[None]] | None = None,
     ) -> None:
+        if (load_profile is None) != (save_profile is None):
+            raise ValueError("pass load_profile and save_profile together")
         self._templates = templates
         self._change_password = change_password
+        self.load_profile = load_profile
+        self._save_profile = save_profile
         self._page_identity = require_page_identity(self.login_url)
 
     def router(self) -> APIRouter:
@@ -331,6 +385,12 @@ class SettingsViews:
                 return await self._save_password(request, user)
 
             router.add_api_route(f"{self.url}/password", change_password, methods=["POST"])
+        if self.load_profile is not None:
+
+            async def save_profile(request: Request, user: Identity = Depends(page_identity)):
+                return await self._save_profile_section(request, user)
+
+            router.add_api_route(f"{self.url}/profile", save_profile, methods=["POST"])
         return router
 
     # sections
@@ -366,6 +426,8 @@ class SettingsViews:
         settings = get_settings_service(request)
         values = await settings.effective(user)
         sections = []
+        if self.load_profile is not None:
+            sections.append(self._profile_section(await self.load_profile(user)))
         preferences = self._definitions(settings, "preferences")
         if preferences:
             sections.append(self._section("preferences", preferences, values))
@@ -452,6 +514,68 @@ class SettingsViews:
                 await settings.reset_user(user, key)
             else:
                 await settings.set_user(user, key, value)
+
+    # profile
+
+    def _profile_section(
+        self, profile: Profile, errors: dict[str, list[str]] | None = None
+    ) -> dict[str, Any]:
+        """The Profile section: two plain str fields (duck-typed settings, so
+        greentechhub-ui's settings templates render them as text inputs)."""
+
+        def field(key: str, label: str, help_text: str = "") -> dict[str, Any]:
+            return {"key": key, "type": "str", "label": label, "default": "",
+                    "help_text": help_text}
+
+        return {
+            "id": "profile",
+            "title": self.profile_title,
+            "description": self.profile_description,
+            "settings": [
+                field("display_name", "Display name", "Shown instead of your user ID."),
+                field("email", "Email"),
+            ],
+            "values": {"display_name": profile.display_name, "email": profile.email},
+            "errors": errors,
+            "action": f"{self.url}/profile",
+            "submit_label": "Save profile",
+        }
+
+    def _check_profile(self, profile: Profile) -> dict[str, list[str]]:
+        errors: dict[str, list[str]] = {}
+        if len(profile.display_name) > self.max_display_name_length:
+            errors["display_name"] = [
+                f"Use at most {self.max_display_name_length} characters."
+            ]
+        email = profile.email
+        local, at, domain = email.partition("@")
+        if email and (
+            not (local and at and domain) or "@" in domain or any(c.isspace() for c in email)
+        ):
+            errors["email"] = ["Enter an email address, like name@example.com."]
+        return errors
+
+    async def _save_profile_section(self, request: Request, user: Identity):
+        assert self._save_profile is not None  # the route is only mounted with the hooks
+        form = await request.form()
+        profile = Profile(
+            display_name=str(form.get("display_name") or "").strip(),
+            email=str(form.get("email") or "").strip(),
+        )
+        errors = self._check_profile(profile)
+        if not errors:
+            try:
+                await self._save_profile(user, profile)
+            except ProfileError as exc:
+                errors = exc.errors
+        if errors:
+            return self._render_section(
+                request, self._profile_section(profile, errors), status_code=422
+            )
+        return self._render_section(
+            request, self._profile_section(profile),
+            headers={"HX-Trigger": _toast_trigger("Profile saved", {})},
+        )
 
     # change password
 
