@@ -76,6 +76,30 @@ Set `register_url` (e.g. `"/register"`) when the service offers sign-up: `LoginV
 to the template, so the sign-in page can link to "Create account". Left at `None`, nothing changes. The link is
 also left out while core's self-signup setting (below) is off.
 
+**Login throttling.** Pass core's `LoginThrottle` as `throttle=` to lock out repeated failed logins
+([core docs](https://github.com/GreenMachine582/greentechhub-core/blob/main/docs/modules.md#login-throttling)):
+
+```python
+from greentechhub_core.security import LoginThrottle
+from greentechhub_core.sqlalchemy import SQLAlchemyAttemptStore, login_attempts_table
+
+attempts = SQLAlchemyAttemptStore(login_attempts_table(metadata), async_session_factory=async_session)
+router = MyLoginViews(templates=..., identity_provider=..., throttle=LoginThrottle(attempts)).router()
+```
+
+- Failures count against the account (the user ID, ignoring case and spaces) **and** the client address, so neither
+  one guesser trying many accounts nor many clients trying one account gets unlimited tries. By default 5 failures
+  within 15 minutes lock a key for 15 minutes.
+- A locked-out attempt, including the failure that trips the lock, re-renders the sign-in page with status 429, a
+  `Retry-After` header and the `error` "Too many failed sign-ins. Try again in N minutes." `authenticate()` isn't
+  called while locked. The message is the same whether or not the account exists.
+- A successful login clears the account's count, not the client's.
+- The client address is `request.client.host`. Behind a reverse proxy, set `TRUSTED_PROXIES` so `register_core`'s
+  proxy-headers middleware puts the real client there; otherwise every user shares the proxy's address. Override
+  `client_address(request)` for another source.
+- `InMemoryAttemptStore` suits a single process only. Call `throttle.prune()` now and then (e.g. from a scheduled
+  job) to delete expired records.
+
 **Sign-up: `RegisterViews`** (`greentechhub_fastapi.auth.RegisterViews`) is the same idea for self-service sign-up:
 `GET`/`POST /register`, with only storing the new user left to fill in:
 

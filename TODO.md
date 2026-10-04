@@ -13,8 +13,9 @@ consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.
 
 ### Accounts (M1)
 - [ ] Profile page — display name and email, shown in the user menu
-- [ ] Login hardening — rate limit and lockout through core's login throttling, one generic error for a wrong user
-  or password, CSRF tokens on the auth forms
+- [ ] CSRF tokens on the auth forms — opt-in on `LoginViews`/`RegisterViews`, passing `csrf_token` to the template
+  and checking it on POST; needs greentechhub-ui's sign-in and sign-up pages to render the hidden field first (the
+  rest of login hardening, throttling and one generic error, is done)
 
 ### Notifications & email (M2)
 - [ ] `register_notifications` — list, mark-read and mark-all-read routes, plus a `notify(user, toast_payload)`
