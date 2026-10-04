@@ -73,7 +73,8 @@ class MyLoginViews(LoginViews):
 ```
 
 Set `register_url` (e.g. `"/register"`) when the service offers sign-up: `LoginViews` then also passes `register_url`
-to the template, so the sign-in page can link to "Create account". Left at `None`, nothing changes.
+to the template, so the sign-in page can link to "Create account". Left at `None`, nothing changes. The link is
+also left out while core's self-signup setting (below) is off.
 
 **Sign-up: `RegisterViews`** (`greentechhub_fastapi.auth.RegisterViews`) is the same idea for self-service sign-up:
 `GET`/`POST /register`, with only storing the new user left to fill in:
@@ -99,13 +100,25 @@ app.include_router(MyRegisterViews(templates=..., identity_provider=...).router(
   for an expected refusal; let real failures propagate.
 - A refused sign-up re-renders with status 422. A successful one signs the new user straight in, like a login: the
   session cookie, then the landing page (or `redirect_url`).
-- `register_template` defaults to `"register_page.html"` (greentechhub-ui's sign-up page, planned alongside
-  `login_page.html`; set your own template until it ships). It gets `register_url`, `login_url` and
+- `register_template` defaults to `"register_page.html"` (greentechhub-ui's sign-up page, in its release after
+  v0.14; set your own template until you're on it). It gets `register_url`, `login_url` and
   `min_password_length` on every render, plus `errors` (`{field: [message]}`) and the submitted `user_id` after a
   refusal. The password is never sent back.
-- `is_open(request)` decides whether sign-up is open; by default it returns `signup_open` (`True`). Set
-  `signup_open = False`, or override `is_open` to read an app setting or a feature flag. While closed, both routes
-  answer 404.
+- `is_open(request)` decides whether sign-up is open. By default it's open while `signup_open` (`True`) is set and,
+  when it's registered through `register_settings`, core's `self_signup_setting()` is on. That makes sign-up an
+  app setting an admin can switch off from the settings page:
+
+  ```python
+  from greentechhub_core.settings.builtins import self_signup_setting
+
+  register_settings(app, settings, registry=SettingsRegistry([
+      self_signup_setting(edit_permission="settings.manage"),  # default=False for invite-only
+  ]))
+  ```
+
+  `signup_open = False` closes sign-up whatever the setting says; override `is_open` for another rule, such as a
+  feature flag. While closed, both routes answer 404. `settings.self_signup_open(request)` gives the same answer for
+  your own routes.
 
 ## Requiring a login on page routes
 

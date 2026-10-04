@@ -189,6 +189,11 @@ registry = SettingsRegistry([
   choices falls back to the default), so it's never an open redirect. `/` is never redirected automatically, since it
   may itself be a choice.
 
+**Self-service sign-up.** With core's `self_signup_setting()` in the registry, `RegisterViews` closes its routes and
+`LoginViews` hides its "Create account" link while the app value is off. `self_signup_open(request, *,
+fallback=True)` (async, `greentechhub_fastapi.settings`) gives the same answer for your own routes. See
+[auth.md](auth.md) for details.
+
 **Page context.** `register_settings` adds `SettingsContextMiddleware` (innermost, after proxy headers and auth). For
 page requests (`Accept: text/html`, or an htmx request) it resolves the user, their granted permissions and their
 effective settings once; JSON and static requests skip it. `settings_context`, a `Jinja2Templates` context

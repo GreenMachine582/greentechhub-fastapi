@@ -10,12 +10,17 @@ from fastapi.templating import Jinja2Templates
 from greentechhub_core.identity import DevelopmentIdentityProvider, Identity
 from greentechhub_core.identity.models import RawAuthContext
 from greentechhub_core.settings import InMemorySettingsStore, SettingsRegistry
-from greentechhub_core.settings.builtins import landing_page_setting
+from greentechhub_core.settings.builtins import (
+    SELF_SIGNUP_KEY,
+    landing_page_setting,
+    self_signup_setting,
+)
 from jinja2 import DictLoader, Environment
 
 from greentechhub_fastapi import register_settings
 from greentechhub_fastapi.auth import LoginViews, RegisterViews, RegistrationError
 from greentechhub_fastapi.auth.cookies import SESSION_COOKIE_NAME
+from greentechhub_fastapi.settings import get_settings_config
 from tests.conftest import build_app
 from tests.test_settings import role_settings  # noqa: F401
 
@@ -171,3 +176,44 @@ def test_login_page_links_to_sign_up_only_when_told():
     assert _call(app, "GET", "/login").text == "Log in or create an account at /register"
     failed = _call(app, "POST", "/login", {"user_id": "x", "password": "y"})
     assert failed.status_code == 401 and "/register" in failed.text
+
+
+# ── core's self_signup_setting ─────────────────────────────────────────────
+
+
+def _signup_app(role_settings, *, default=True) -> FastAPI:  # noqa: F811
+    app = build_app(role_settings)
+    setting = self_signup_setting(default=default, edit_permission="settings.manage")
+    register_settings(app, role_settings, registry=SettingsRegistry([setting]),
+                      store=InMemorySettingsStore())
+    linked = _Login(templates=_templates(), identity_provider=_provider())
+    linked.register_url = "/register"
+    app.include_router(linked.router())
+    return app
+
+
+def test_the_self_signup_setting_closes_sign_up_and_hides_the_link(role_settings):  # noqa: F811
+    app = _app(_views(), _signup_app(role_settings, default=False))
+    assert _call(app, "GET", "/register").status_code == 404
+    assert _call(app, "POST", "/register", _form()).status_code == 404
+    assert _call(app, "GET", "/login").text == "Log in"
+
+
+def test_sign_up_stays_open_while_the_setting_is_on(role_settings):  # noqa: F811
+    app = _app(_views(), _signup_app(role_settings))
+    assert _call(app, "GET", "/register").status_code == 200
+    assert _call(app, "POST", "/register", _form()).status_code == 303
+    assert _call(app, "GET", "/login").text == "Log in or create an account at /register"
+
+
+def test_turning_the_setting_off_closes_sign_up_at_once(role_settings):  # noqa: F811
+    app = _app(_views(), _signup_app(role_settings))
+    settings = get_settings_config(app).settings
+    settings.set_app_sync(SELF_SIGNUP_KEY, False, granted={"settings.manage"})
+    assert _call(app, "GET", "/register").status_code == 404
+    assert _call(app, "GET", "/login").text == "Log in"
+
+
+def test_signup_open_false_wins_over_the_setting(role_settings):  # noqa: F811
+    app = _app(_views(signup_open=False), _signup_app(role_settings))
+    assert _call(app, "GET", "/register").status_code == 404
