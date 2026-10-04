@@ -17,9 +17,8 @@ consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.
   rest of login hardening, throttling and one generic error, is done)
 
 ### Notifications & email (M2)
-- [ ] `register_notifications` — list, mark-read and mark-all-read routes, plus a `notify(user, toast_payload)`
-  helper over core's `NotificationStore`
-- [ ] Email delivery adapter (SMTP first), used by notifications and the views below
+- [ ] Email delivery adapter (SMTP first), used by the views below and by `notify` for the "email" channel of
+  the delivery preferences (people can choose it, but nothing is sent yet)
 - [ ] Password reset — forgot-password and reset-by-token views on core's single-use tokens
 - [ ] Email verification — optional; gates login until the address is confirmed
 

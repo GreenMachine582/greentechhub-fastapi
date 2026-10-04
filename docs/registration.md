@@ -286,4 +286,52 @@ since a later context processor's key replaces this one's.
   `get_effective_settings` (the current user's values, secrets as the marker) and `get_secret(key)` (a secret's
   plaintext).
 
+## Notifications
+
+`register_notifications(app, settings, store=..., views=...)` puts greentechhub-core's `NotificationStore` on the app
+for `notify()`, and `NotificationViews` gives each signed-in user their notification centre:
+
+```python
+from greentechhub_core.notifications import notification_preferences
+from greentechhub_core.sqlalchemy import SQLAlchemyNotificationStore, notifications_table
+from greentechhub_fastapi import register_notifications
+from greentechhub_fastapi.notifications import NotificationViews, notifications_nav_item, notify
+
+store = SQLAlchemyNotificationStore(notifications_table(metadata), async_session_factory=async_session)
+register_notifications(app, settings, store=store, views=NotificationViews(templates=templates))
+nav_items = [..., notifications_nav_item()]  # greentechhub-ui NavItem with a live unread badge
+
+# anywhere with the app at hand: a route, a background job
+await notify(app, user, toast("Sync finished", kind="success"), category="sync")
+```
+
+- `notify(app, recipient, payload, *, category="general")` takes an `Identity` or a bare subject (for a job with no
+  `Identity`) and a greentechhub-ui `toast()` payload, either its detail or the whole `{"showToast": ...}`. It stores
+  the notice and returns it.
+- **Delivery preferences:** register core's `notification_preferences({"sync": "Sync results"})` settings through
+  `register_settings` and each person picks, per category, in the app, by email, both or off, on the settings page.
+  `notify` stores nothing and returns `None` when their choice leaves out the app. A category without a preference
+  always goes to the app. The email channel isn't sent yet; that comes with the email adapter.
+- Read notifications pile up: call `store.prune(before)` now and then (e.g. from a scheduled job). Unread ones are
+  never pruned.
+
+| Route | Does |
+|---|---|
+| `GET /notifications` | the user's notifications, newest first (`page_size`, 50); `?unread=1` for unread only. Anonymous → login redirect |
+| `GET /notifications/panel` | the newest `panel_size` (10), as a partial for a navbar dropdown |
+| `GET /notifications/badge` | the unread count for `gth_nav_badge`'s `badge_url`; 204 for an anonymous visitor |
+| `POST /notifications/{id}/read` | mark one read (only the user's own) |
+| `POST /notifications/read-all` | mark all of the user's read |
+
+Both marks answer 204 with `HX-Trigger: {"gth:notifications": {"unread": n}}` (`NOTIFICATIONS_EVENT`), which
+re-fetches the badge from `notifications_nav_item()`. A form without htmx can post a local `next` path to be
+redirected there (303) instead; anything else is ignored, so it's never an open redirect.
+
+**Templates.** They default to greentechhub-ui's notification centre (`notifications_page.html`,
+`notifications_panel.html`, `notification_badge.html`, still to come there); set `page_template` / `panel_template` /
+`badge_template` to use your own. The page and panel get `page_title`, `notifications`, `unread_count`,
+`unread_only`, `page_url` and `mark_all_url`. Each notification is a dict of its fields (`id`, `message`, `kind`,
+`title`, `icon`, `action_label`, `action_url`, `category`, `created_at`, `read_at`) plus `read`, `read_url` and
+`toast` (its `toast()` detail). The badge gets `count` and should render nothing for 0.
+
 See [docs/auth.md](auth.md), [docs/health.md](health.md), and [docs/modules.md](modules.md) for what each `register_*` call actually wires up.
