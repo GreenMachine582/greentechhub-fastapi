@@ -206,6 +206,7 @@ processor, turns that into greentechhub-ui's optional template keys:
 | `theme_mode` | signed in, and `ui.theme` is registered |
 | `theme_save_url`, `user_menu_items` (Settings) | signed in, and `views` were mounted |
 | `logout_url` | signed in, and `logout_url` was given |
+| `user_display_name` | signed in, `views` have the profile hooks, and the user has set a display name |
 | `site_banners` | core's `site_banner_settings()` is registered and the message isn't empty: any visitor, signed in or not |
 
 **Site banner.** Register core's banner settings and every page shows the message above the navbar once someone sets
@@ -232,6 +233,7 @@ since a later context processor's key replaces this one's.
 | `POST /settings/preferences` | coerce each field; 422 with the section and its errors, or save and return the section with a toast (plus `gth:theme` when the theme changed) |
 | `POST /settings/app` | the same for APP settings; 403 without `manage_permission` |
 | `POST /settings/theme` | the theme toggle's save (`theme=light\|dark`): 204, 401 anonymous, 422 invalid |
+| `POST /settings/profile` | only with `load_profile=`/`save_profile=`: save the signed-in user's display name and email (below) |
 | `POST /settings/password` | only with `change_password=`: change the signed-in user's password (below) |
 
 - A preference saved equal to what the user would get anyway (the app value, env override or default) resets their
@@ -239,6 +241,27 @@ since a later context processor's key replaces this one's.
 - Subclass to change `url`, `login_url`, `title`, the section titles/descriptions, or `page_template` /
   `section_template` to use your own templates (they get `settings_sections` / `section`, see greentechhub-ui's
   docs/components.md).
+- **Profile** (opt-in): pass `load_profile`, an async `(user) -> Profile`, and `save_profile`, an async
+  `(user, Profile) -> None`, over your own users table (`Profile` and `ProfileError` are in
+  `greentechhub_fastapi.settings`; an empty string means not set). The page then opens with a Profile section: a
+  display name and an email. Its route strips both and checks that the display name has at most
+  `max_display_name_length` (80) characters and the email looks like an address or is empty, then calls yours. Raise
+  `ProfileError({"email": ["That email is in use."]})` for an expected refusal. The answer is 422 with the section's
+  errors and the submitted values, or 200 with the saved section and a "Profile saved" toast. The email isn't verified
+  yet (that's the planned email verification).
+
+  `register_settings` hands `load_profile` to the page-context middleware, which calls it once per page request for a
+  signed-in user (keep it a cheap lookup), and a display name reaches templates as `user_display_name`, for the user
+  menu to show instead of the user ID. The session's `current_user` is unchanged.
+
+  ```python
+  async def load_profile(user: Identity) -> Profile:
+      async with resolve_dependency(app, get_session) as session:
+          row = await session.get(User, user.subject)
+      return Profile(display_name=row.display_name or "", email=row.email or "")
+
+  views = SettingsViews(templates=templates, load_profile=load_profile, save_profile=save_profile)
+  ```
 - **Change password** (opt-in): pass `change_password`, an async `(user, current, new) -> bool` that returns `False`
   when `current` isn't the user's password and otherwise stores `new` (hashing it is yours, as with `LoginViews`).
   The page then shows a Password section after Preferences. Its route first checks the fields: the current password
