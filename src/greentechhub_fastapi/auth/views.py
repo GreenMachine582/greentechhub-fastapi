@@ -78,6 +78,11 @@ class LoginViews(ABC):
     #: this class's own mount path for the two /login routes.
     login_url: str = "/login"
 
+    #: The sign-up page (RegisterViews.register_url) when the service offers
+    #: one; passed to the template as `register_url` so it can show a "Create
+    #: account" link. None (the default) leaves it out.
+    register_url: str | None = None
+
     def __init__(
         self, *, templates: Jinja2Templates, identity_provider: DevelopmentIdentityProvider
     ):
@@ -103,10 +108,14 @@ class LoginViews(ABC):
         router.add_api_route("/logout", self._logout, methods=["POST"])
         return router
 
+    def _context(self, **extra) -> dict:
+        context = {"login_url": self.login_url, **extra}
+        if self.register_url:
+            context["register_url"] = self.register_url
+        return context
+
     async def _login_form(self, request: Request):
-        return self._templates.TemplateResponse(
-            request, self.login_template, {"login_url": self.login_url}
-        )
+        return self._templates.TemplateResponse(request, self.login_template, self._context())
 
     async def _login_submit(
         self, request: Request, user_id: str = Form(...), password: str = Form(...)
@@ -116,11 +125,7 @@ class LoginViews(ABC):
             return self._templates.TemplateResponse(
                 request,
                 self.login_template,
-                {
-                    "login_url": self.login_url,
-                    "error": "Incorrect user ID or password",
-                    "user_id": user_id,
-                },
+                self._context(error="Incorrect user ID or password", user_id=user_id),
                 status_code=401,
             )
 

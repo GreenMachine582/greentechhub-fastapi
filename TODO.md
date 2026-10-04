@@ -12,8 +12,8 @@ Cross-repo order (with greentechhub-core and greentechhub-ui): Accounts (M1) →
 consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.0.
 
 ### Accounts (M1)
-- [ ] `RegisterViews` — mirrors `LoginViews`: GET/POST `/register`, a subclass implements `create_user()`, renders
-  greentechhub-ui's `register_page.html`; an app setting turns self-signup off
+- [ ] Self-signup setting — `RegisterViews.is_open` reads greentechhub-core's planned `self_signup_setting()` (an
+  APP bool, edit-gated) by default once core ships it; until then `signup_open` or an `is_open` override decides
 - [ ] Change password — a section on the settings page for signed-in users (current + new password)
 - [ ] Profile page — display name and email, shown in the user menu
 - [ ] Login hardening — rate limit and lockout through core's login throttling, one generic error for a wrong user

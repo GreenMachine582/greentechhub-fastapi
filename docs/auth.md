@@ -72,6 +72,41 @@ class MyLoginViews(LoginViews):
     login_template = "login.html"
 ```
 
+Set `register_url` (e.g. `"/register"`) when the service offers sign-up: `LoginViews` then also passes `register_url`
+to the template, so the sign-in page can link to "Create account". Left at `None`, nothing changes.
+
+**Sign-up: `RegisterViews`** (`greentechhub_fastapi.auth.RegisterViews`) is the same idea for self-service sign-up:
+`GET`/`POST /register`, with only storing the new user left to fill in:
+
+```python
+from greentechhub_core.security import hash_password
+from greentechhub_fastapi.auth import RegisterViews, RegistrationError, resolve_dependency
+
+class MyRegisterViews(RegisterViews):
+    async def create_user(self, user_id: str, password: str) -> Identity:
+        async with resolve_dependency(app, get_session) as session:
+            if await session.get(User, user_id):
+                raise RegistrationError({"user_id": ["That user ID is taken."]})
+            session.add(User(id=user_id, password_hash=hash_password(password)))
+            await session.commit()
+        return Identity(subject=user_id, username=user_id, email=None, groups=[], claims={})
+
+app.include_router(MyRegisterViews(templates=..., identity_provider=...).router())
+```
+
+- It checks the form first: a user ID (spaces trimmed), a password of at least `min_password_length` (8), and a
+  matching `password_confirm`. Only then does it call `create_user`. Raise `RegistrationError({field: [message]})`
+  for an expected refusal; let real failures propagate.
+- A refused sign-up re-renders with status 422. A successful one signs the new user straight in, like a login: the
+  session cookie, then the landing page (or `redirect_url`).
+- `register_template` defaults to `"register_page.html"` (greentechhub-ui's sign-up page, planned alongside
+  `login_page.html`; set your own template until it ships). It gets `register_url`, `login_url` and
+  `min_password_length` on every render, plus `errors` (`{field: [message]}`) and the submitted `user_id` after a
+  refusal. The password is never sent back.
+- `is_open(request)` decides whether sign-up is open; by default it returns `signup_open` (`True`). Set
+  `signup_open = False`, or override `is_open` to read an app setting or a feature flag. While closed, both routes
+  answer 404.
+
 ## Requiring a login on page routes
 
 `get_current_user` resolves to `None` for anonymous callers, and `dependencies.get_current_identity` turns that into a 401 JSON envelope — right for APIs, wrong for browser pages. For server-rendered routes use `dependencies.require_page_identity(login_url="/login")`:
