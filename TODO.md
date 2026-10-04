@@ -14,7 +14,6 @@ consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.
 ### Accounts (M1)
 - [ ] Self-signup setting — `RegisterViews.is_open` reads greentechhub-core's planned `self_signup_setting()` (an
   APP bool, edit-gated) by default once core ships it; until then `signup_open` or an `is_open` override decides
-- [ ] Change password — a section on the settings page for signed-in users (current + new password)
 - [ ] Profile page — display name and email, shown in the user menu
 - [ ] Login hardening — rate limit and lockout through core's login throttling, one generic error for a wrong user
   or password, CSRF tokens on the auth forms
