@@ -10,8 +10,10 @@ method, just as LoginViews leaves only authenticate().
 
 Same rules as LoginViews: no ORM or session here (create_user acquires its
 own, e.g. through resolve_dependency), and the caller builds the identity
-provider. Whether sign-up is open at all is `is_open(request)`: True by
-default (`signup_open`), overridden to read an app setting or a feature flag.
+provider. Whether sign-up is open at all is `is_open(request)`: by default
+`signup_open` and, when register_settings registered it, core's
+self_signup_setting, so an admin can close sign-up from the settings page.
+Override it for another rule, e.g. a feature flag.
 """
 
 from abc import ABC, abstractmethod
@@ -64,8 +66,8 @@ class RegisterViews(ABC):
     #: the fallback when it can't be resolved.
     redirect_url: str = "/"
 
-    #: Whether sign-up is open; is_open() returns it. Override is_open() for a
-    #: per-request answer (an app setting, a feature flag).
+    #: False closes sign-up whatever the self-signup setting says. Override
+    #: is_open() for another per-request answer (a feature flag).
     signup_open: bool = True
 
     #: The shortest password accepted.
@@ -78,8 +80,12 @@ class RegisterViews(ABC):
         self._identity_provider = identity_provider
 
     async def is_open(self, request: Request) -> bool:
-        """Whether this request may sign up. Default: `signup_open`."""
-        return self.signup_open
+        """Whether this request may sign up. Default: `signup_open`, and core's
+        self_signup_setting when register_settings registered it."""
+        # Imported here for the same reason as landing_url below.
+        from greentechhub_fastapi.settings import self_signup_open
+
+        return self.signup_open and await self_signup_open(request)
 
     @abstractmethod
     async def create_user(self, user_id: str, password: str) -> Identity:

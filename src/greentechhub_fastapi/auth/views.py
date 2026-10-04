@@ -80,7 +80,9 @@ class LoginViews(ABC):
 
     #: The sign-up page (RegisterViews.register_url) when the service offers
     #: one; passed to the template as `register_url` so it can show a "Create
-    #: account" link. None (the default) leaves it out.
+    #: account" link. None (the default) leaves it out, and so does core's
+    #: self_signup_setting while it's off. A RegisterViews with its own
+    #: is_open() rule should keep this in step with it.
     register_url: str | None = None
 
     def __init__(
@@ -108,14 +110,20 @@ class LoginViews(ABC):
         router.add_api_route("/logout", self._logout, methods=["POST"])
         return router
 
-    def _context(self, **extra) -> dict:
+    async def _context(self, request: Request, **extra) -> dict:
+        # Imported here: greentechhub_fastapi.settings imports auth.dependency,
+        # whose package __init__ imports this module.
+        from greentechhub_fastapi.settings import self_signup_open
+
         context = {"login_url": self.login_url, **extra}
-        if self.register_url:
+        if self.register_url and await self_signup_open(request):
             context["register_url"] = self.register_url
         return context
 
     async def _login_form(self, request: Request):
-        return self._templates.TemplateResponse(request, self.login_template, self._context())
+        return self._templates.TemplateResponse(
+            request, self.login_template, await self._context(request)
+        )
 
     async def _login_submit(
         self, request: Request, user_id: str = Form(...), password: str = Form(...)
@@ -125,7 +133,9 @@ class LoginViews(ABC):
             return self._templates.TemplateResponse(
                 request,
                 self.login_template,
-                self._context(error="Incorrect user ID or password", user_id=user_id),
+                await self._context(
+                    request, error="Incorrect user ID or password", user_id=user_id
+                ),
                 status_code=401,
             )
 

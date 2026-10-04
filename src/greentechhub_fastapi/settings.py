@@ -16,6 +16,8 @@ registration.settings.register_settings, over greentechhub-core's Settings.
   for server code (e.g. an IMAP login), never a template.
 - landing_url: the user's chosen landing page (core's landing_page_setting),
   which LoginViews redirects to after a login.
+- self_signup_open: core's self_signup_setting, which RegisterViews and
+  LoginViews' "Create account" link follow.
 - SettingsViews: the /settings page, its two section saves and the theme
   toggle's save endpoint, in LoginViews' style. It renders greentechhub-ui's
   settings_page.html / settings_section.html by default, passing data only:
@@ -51,6 +53,7 @@ from greentechhub_core.settings import (
 )
 from greentechhub_core.settings.builtins import (
     LANDING_PAGE_KEY,
+    SELF_SIGNUP_KEY,
     SITE_BANNER_KEY,
     SITE_BANNER_TONE_KEY,
 )
@@ -189,6 +192,20 @@ async def landing_url(request: Request, identity: Identity | None, *, fallback: 
     if config is None or LANDING_PAGE_KEY not in config.settings.registry:
         return fallback
     return await config.settings.get(LANDING_PAGE_KEY, identity) or fallback
+
+
+async def self_signup_open(request: Request, *, fallback: bool = True) -> bool:
+    """Whether self-service sign-up is open: the app's value of core's
+    self_signup_setting (SELF_SIGNUP_KEY). `fallback` when register_settings
+    didn't run or the registry has no such setting, so this is opt-in.
+
+    RegisterViews.is_open checks it by default, and LoginViews hides its
+    "Create account" link while it's off.
+    """
+    config = getattr(request.app.state, SETTINGS_STATE_KEY, None)
+    if config is None or SELF_SIGNUP_KEY not in config.settings.registry:
+        return fallback
+    return bool(await config.settings.get(SELF_SIGNUP_KEY))
 
 
 def settings_context(request: Request) -> dict[str, Any]:
