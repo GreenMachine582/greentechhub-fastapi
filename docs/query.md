@@ -71,3 +71,39 @@ async def list_stocks(params: PageParams = Depends(), session=Depends(get_sessio
 
 `parse_filter_json(raw)` is exported from `greentechhub_fastapi.query` for routes that read the JSON elsewhere,
 such as a form field.
+
+## Validating filters
+
+Pass the fields a page allows to `to_page_request` and the clauses (both `filter` and `filters`) go through
+greentechhub-core's `validate_filters`
+([core docs](https://github.com/GreenMachine582/greentechhub-core/blob/main/docs/query.md#validating-filters)):
+
+```python
+from greentechhub_core.query import FilterField
+
+FIELDS = [
+    FilterField(key="name", type="text"),
+    FilterField(key="stock", type="number"),
+    FilterField(key="added", type="date"),
+    FilterField(key="category", type="choice", choices=["Sensor", "Cable"]),
+]
+
+@router.get("/stocks")
+async def list_stocks(params: PageParams = Depends(), session=Depends(get_session)):
+    request = params.to_page_request(FIELDS)   # max_depth=3, max_filters=20, max_values=100 by default
+    result = await page(session, select(Stock), request, ALLOWED, default_sort=[Sort(field="id")])
+    return to_envelope(result)
+```
+
+- Only those fields, the operators each type takes, and values that fit. Values come back converted: `"10"` becomes
+  `10` for a number, `"2026-01-31"` a `date`, `"true"` a bool. List the same keys in `ALLOWED`, which maps them to
+  columns.
+- Malformed input is still a 422. A problem with a well-formed filter raises core's `BadRequestError`, which the
+  exception handlers (`register_exception_handlers` / `register_api_error_handlers`) answer **400**:
+  `{"code": "invalid_filters", "message", "details": [{"path": "1.0", "field": "stock", "message": ...}]}`. `path`
+  is the clause's index, dotted through groups, so greentechhub-ui's query builder can mark the row.
+- Without `fields`, nothing is validated, as before.
+
+`validated_filter_json(raw, fields, **limits)` does the same for a query builder's JSON posted in a form field. Any
+problem, malformed JSON included, is one `BadRequestError("invalid_filters")`; a parse problem is a single detail
+with `path` `None`.
