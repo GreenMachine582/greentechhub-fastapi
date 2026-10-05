@@ -1,9 +1,16 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from fastapi import FastAPI
 from fastapi.templating import Jinja2Templates
 from greentechhub_core.identity import DevelopmentIdentityProvider, Identity
+from greentechhub_core.security import (
+    InMemoryAttemptStore,
+    LoginThrottle,
+    account_key,
+    client_key,
+)
 from jinja2 import DictLoader, Environment
 
 from greentechhub_fastapi.auth.views import LoginViews
@@ -137,3 +144,94 @@ def test_a_custom_template_still_works():
     assert asyncio.run(_get(app, "/login")).text == "Custom login"
     failed = asyncio.run(_post(app, "/login", data={"user_id": "alice", "password": "x"}))
     assert failed.text == "Custom login - Incorrect user ID or password"
+
+
+# ── login throttling (core's LoginThrottle) ────────────────────────────────
+
+
+class _Clock:
+    def __init__(self):
+        self.now = datetime(2026, 1, 1, tzinfo=UTC)
+
+    def __call__(self):
+        return self.now
+
+
+class _CountingLoginViews(_FakeLoginViews):
+    calls = 0
+
+    async def authenticate(self, user_id, password):
+        type(self).calls += 1
+        return await super().authenticate(user_id, password)
+
+
+def _throttled(clock):
+    store = InMemoryAttemptStore()
+    throttle = LoginThrottle(store, max_failures=3, clock=clock)
+    app = FastAPI()
+    provider = DevelopmentIdentityProvider(secret_key="secret-a")
+    _CountingLoginViews.calls = 0
+    views = _CountingLoginViews(
+        templates=_make_templates(), identity_provider=provider, throttle=throttle
+    )
+    app.include_router(views.router())
+    return app, store
+
+
+def _login(app, password, user_id="alice", client=("203.0.113.7", 1234)):
+    async def run():
+        transport = httpx.ASGITransport(app=app, client=client)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+            return await c.post("/login", data={"user_id": user_id, "password": password},
+                                follow_redirects=False)
+
+    return asyncio.run(run())
+
+
+def test_the_failure_that_reaches_the_limit_locks_the_account_out():
+    app, _ = _throttled(_Clock())
+    assert [_login(app, "wrong").status_code for _ in range(2)] == [401, 401]
+    response = _login(app, "wrong")
+    assert response.status_code == 429
+    assert response.headers["retry-after"] == "900"
+    assert "Too many failed sign-ins. Try again in 15 minutes. as alice" in response.text
+
+
+def test_a_locked_out_login_is_refused_before_the_password_is_checked():
+    app, _ = _throttled(_Clock())
+    for _ in range(3):
+        _login(app, "wrong")
+    calls = _CountingLoginViews.calls
+    response = _login(app, "s3cret")
+    assert response.status_code == 429
+    assert _CountingLoginViews.calls == calls
+
+
+def test_after_the_lockout_a_correct_password_signs_in_and_clears_the_account():
+    clock = _Clock()
+    app, store = _throttled(clock)
+    for _ in range(3):
+        _login(app, "wrong")
+    clock.now += timedelta(minutes=16)
+    response = _login(app, "s3cret")
+    assert response.status_code == 303
+    assert store.get_sync(account_key("alice")) is None
+    assert store.get_sync(client_key("203.0.113.7")).failures == 3
+
+
+def test_one_client_guessing_many_accounts_is_locked_out_too():
+    app, _ = _throttled(_Clock())
+    statuses = [_login(app, "wrong", user_id=f"user{i}").status_code for i in range(3)]
+    assert statuses == [401, 401, 429]
+    assert _login(app, "s3cret", client=("198.51.100.1", 1)).status_code == 303
+
+
+def test_retry_after_counts_down_and_rounds_up_to_whole_minutes():
+    clock = _Clock()
+    app, _ = _throttled(clock)
+    for _ in range(3):
+        _login(app, "wrong")
+    clock.now += timedelta(minutes=14, seconds=30)
+    response = _login(app, "s3cret")
+    assert response.headers["retry-after"] == "30"
+    assert "Try again in 1 minute." in response.text

@@ -189,6 +189,11 @@ registry = SettingsRegistry([
   choices falls back to the default), so it's never an open redirect. `/` is never redirected automatically, since it
   may itself be a choice.
 
+**Self-service sign-up.** With core's `self_signup_setting()` in the registry, `RegisterViews` closes its routes and
+`LoginViews` hides its "Create account" link while the app value is off. `self_signup_open(request, *,
+fallback=True)` (async, `greentechhub_fastapi.settings`) gives the same answer for your own routes. See
+[auth.md](auth.md) for details.
+
 **Page context.** `register_settings` adds `SettingsContextMiddleware` (innermost, after proxy headers and auth). For
 page requests (`Accept: text/html`, or an htmx request) it resolves the user, their granted permissions and their
 effective settings once; JSON and static requests skip it. `settings_context`, a `Jinja2Templates` context
@@ -201,6 +206,7 @@ processor, turns that into greentechhub-ui's optional template keys:
 | `theme_mode` | signed in, and `ui.theme` is registered |
 | `theme_save_url`, `user_menu_items` (Settings) | signed in, and `views` were mounted |
 | `logout_url` | signed in, and `logout_url` was given |
+| `user_display_name` | signed in, `views` have the profile hooks, and the user has set a display name |
 | `site_banners` | core's `site_banner_settings()` is registered and the message isn't empty: any visitor, signed in or not |
 
 **Site banner.** Register core's banner settings and every page shows the message above the navbar once someone sets
@@ -227,14 +233,138 @@ since a later context processor's key replaces this one's.
 | `POST /settings/preferences` | coerce each field; 422 with the section and its errors, or save and return the section with a toast (plus `gth:theme` when the theme changed) |
 | `POST /settings/app` | the same for APP settings; 403 without `manage_permission` |
 | `POST /settings/theme` | the theme toggle's save (`theme=light\|dark`): 204, 401 anonymous, 422 invalid |
+| `POST /settings/profile` | only with `load_profile=`/`save_profile=`: save the signed-in user's display name and email (below) |
+| `POST /settings/password` | only with `change_password=`: change the signed-in user's password (below) |
 
 - A preference saved equal to what the user would get anyway (the app value, env override or default) resets their
   own value instead of storing it, so saving an untouched form doesn't pin today's defaults.
 - Subclass to change `url`, `login_url`, `title`, the section titles/descriptions, or `page_template` /
   `section_template` to use your own templates (they get `settings_sections` / `section`, see greentechhub-ui's
   docs/components.md).
+- **Profile** (opt-in): pass `load_profile`, an async `(user) -> Profile`, and `save_profile`, an async
+  `(user, Profile) -> None`, over your own users table (`Profile` and `ProfileError` are in
+  `greentechhub_fastapi.settings`; an empty string means not set). The page then opens with a Profile section: a
+  display name and an email. Its route strips both and checks that the display name has at most
+  `max_display_name_length` (80) characters and the email looks like an address or is empty, then calls yours. Raise
+  `ProfileError({"email": ["That email is in use."]})` for an expected refusal. The answer is 422 with the section's
+  errors and the submitted values, or 200 with the saved section and a "Profile saved" toast. The email isn't verified
+  yet (that's the planned email verification).
+
+  `register_settings` hands `load_profile` to the page-context middleware, which calls it once per page request for a
+  signed-in user (keep it a cheap lookup), and a display name reaches templates as `user_display_name`, for the user
+  menu to show instead of the user ID. The session's `current_user` is unchanged.
+
+  ```python
+  async def load_profile(user: Identity) -> Profile:
+      async with resolve_dependency(app, get_session) as session:
+          row = await session.get(User, user.subject)
+      return Profile(display_name=row.display_name or "", email=row.email or "")
+
+  views = SettingsViews(templates=templates, load_profile=load_profile, save_profile=save_profile)
+  ```
+- **Change password** (opt-in): pass `change_password`, an async `(user, current, new) -> bool` that returns `False`
+  when `current` isn't the user's password and otherwise stores `new` (hashing it is yours, as with `LoginViews`).
+  The page then shows a Password section after Preferences. Its route first checks the fields: the current password
+  is given, the new one has at least `min_password_length` (8) characters, differs from the current one and is
+  confirmed. It then calls yours: 422 with the section's errors, or 200 with an empty section and a "Password
+  changed" toast. The fields are write-only secret fields, so greentechhub-ui's settings templates render them as
+  empty password inputs and nothing is filled back in. Sessions already issued stay valid (they're stateless JWTs).
+
+  ```python
+  async def change_password(user: Identity, current: str, new: str) -> bool:
+      async with resolve_dependency(app, get_session) as session:
+          row = await session.get(User, user.subject)
+          if row is None or not verify_password(current, row.password_hash):
+              return False
+          row.password_hash = hash_password(new)
+          await session.commit()
+      return True
+
+  views = SettingsViews(templates=templates, change_password=change_password)
+  ```
 - Dependencies for your own routes, in `greentechhub_fastapi.settings`: `get_settings_service` (the `Settings`),
   `get_effective_settings` (the current user's values, secrets as the marker) and `get_secret(key)` (a secret's
   plaintext).
+
+## Notifications
+
+`register_notifications(app, settings, store=..., views=...)` puts greentechhub-core's `NotificationStore` on the app
+for `notify()`, and `NotificationViews` gives each signed-in user their notification centre:
+
+```python
+from greentechhub_core.notifications import notification_preferences
+from greentechhub_core.sqlalchemy import SQLAlchemyNotificationStore, notifications_table
+from greentechhub_fastapi import register_notifications
+from greentechhub_fastapi.notifications import NotificationViews, notifications_nav_item, notify
+
+store = SQLAlchemyNotificationStore(notifications_table(metadata), async_session_factory=async_session)
+register_notifications(app, settings, store=store, views=NotificationViews(templates=templates))
+nav_items = [..., notifications_nav_item()]  # greentechhub-ui NavItem with a live unread badge
+
+# anywhere with the app at hand: a route, a background job
+await notify(app, user, toast("Sync finished", kind="success"), category="sync")
+```
+
+- `notify(app, recipient, payload, *, category="general")` takes an `Identity` or a bare subject (for a job with no
+  `Identity`) and a greentechhub-ui `toast()` payload, either its detail or the whole `{"showToast": ...}`. It stores
+  the notice and returns it.
+- **Delivery preferences:** register core's `notification_preferences({"sync": "Sync results"})` settings through
+  `register_settings` and each person picks, per category, in the app, by email, both or off, on the settings page.
+  `notify` stores nothing and returns `None` when their choice leaves out the app. A category without a preference
+  always goes to the app.
+- **By email:** when someone's choice includes email and [`register_email`](#email) ran, `notify` emails them too: to
+  their `Identity.email`, else `register_email`'s `address_for(subject)`. The subject is the title, else the message;
+  the text is the message plus the action link, made absolute with `base_url`. A failed or unconfigured send, or no
+  address, is logged as a warning and never raised, so a mail problem can't break the in-app notice or the caller.
+  `notify` returns the stored notification, or `None` when it wasn't stored (email only, or off).
+- Read notifications pile up: call `store.prune(before)` now and then (e.g. from a scheduled job). Unread ones are
+  never pruned.
+
+| Route | Does |
+|---|---|
+| `GET /notifications` | the user's notifications, newest first (`page_size`, 50); `?unread=1` for unread only. Anonymous → login redirect |
+| `GET /notifications/panel` | the newest `panel_size` (10), as a partial for a navbar dropdown |
+| `GET /notifications/badge` | the unread count for `gth_nav_badge`'s `badge_url`; 204 for an anonymous visitor |
+| `POST /notifications/{id}/read` | mark one read (only the user's own) |
+| `POST /notifications/read-all` | mark all of the user's read |
+
+Both marks answer 204 with `HX-Trigger: {"gth:notifications": {"unread": n}}` (`NOTIFICATIONS_EVENT`), which
+re-fetches the badge from `notifications_nav_item()`. A form without htmx can post a local `next` path to be
+redirected there (303) instead; anything else is ignored, so it's never an open redirect.
+
+**Templates.** They default to greentechhub-ui's notification centre (`notifications_page.html`,
+`notifications_panel.html`, `notification_badge.html`, still to come there); set `page_template` / `panel_template` /
+`badge_template` to use your own. The page and panel get `page_title`, `notifications`, `unread_count`,
+`unread_only`, `page_url` and `mark_all_url`. Each notification is a dict of its fields (`id`, `message`, `kind`,
+`title`, `icon`, `action_label`, `action_url`, `category`, `created_at`, `read_at`) plus `read`, `read_url` and
+`toast` (its `toast()` detail). The badge gets `count` and should render nothing for 0.
+
+## Email
+
+`register_email(app, settings, sender=..., address_for=None, base_url=None)` puts a greentechhub-core `EmailSender`
+on the app, for `send_email()` and the email channel of [notifications](#notifications). The usual sender is core's
+`SettingsEmailSender`, which reads the mail server from core's `smtp_settings` on every send. An admin sets it up in
+Settings › App, and the password is a write-only, encrypted secret setting, so it never goes in the environment:
+
+```python
+from greentechhub_core.email import SettingsEmailSender, smtp_settings
+from greentechhub_core.settings.crypto import settings_cipher
+from greentechhub_fastapi import register_email, register_settings
+
+registry = SettingsRegistry([*USER_PREFERENCES, *smtp_settings(edit_permission="settings.manage")])
+service = register_settings(app, settings, registry=registry, store=store, views=SettingsViews(templates=templates),
+                            manage_permission="settings.manage", cipher=settings_cipher(settings))
+register_email(app, settings, sender=SettingsEmailSender(service), base_url="https://pyfinbot.example")
+```
+
+- `InMemoryEmailSender()` keeps an `outbox` instead of sending, for development and tests.
+- `address_for(subject)` is an async lookup for someone's address when there's only a subject, or an `Identity`
+  without an email, e.g. from your users table or the profile's email. `recipient_address(app, recipient)`
+  (`greentechhub_fastapi.email`) gives the answer: the `Identity.email`, else `address_for`, else `None`.
+- `base_url` makes relative links in emails absolute (`absolute_url(app, "/stocks")`).
+- `send_email(app, message)` sends a core `EmailMessage` (`new_email(to, subject, text, html=None)`), for your own
+  routes and jobs. `get_email_sender` is the same sender as a `Depends()`. Errors propagate: core's
+  `EmailDeliveryError` and `EmailNotConfiguredError` are `ApplicationError`s, so the exception handlers answer 502
+  and 503.
 
 See [docs/auth.md](auth.md), [docs/health.md](health.md), and [docs/modules.md](modules.md) for what each `register_*` call actually wires up.

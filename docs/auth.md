@@ -72,6 +72,174 @@ class MyLoginViews(LoginViews):
     login_template = "login.html"
 ```
 
+Set `register_url` (e.g. `"/register"`) when the service offers sign-up: `LoginViews` then also passes `register_url`
+to the template, so the sign-in page can link to "Create account". Left at `None`, nothing changes. The link is
+also left out while core's self-signup setting (below) is off.
+Set `forgot_password_url` (e.g. `"/forgot-password"`, see `PasswordResetViews` below) and the template gets it too,
+for a "Forgot password?" link.
+
+**Login throttling.** Pass core's `LoginThrottle` as `throttle=` to lock out repeated failed logins
+([core docs](https://github.com/GreenMachine582/greentechhub-core/blob/main/docs/modules.md#login-throttling)):
+
+```python
+from greentechhub_core.security import LoginThrottle
+from greentechhub_core.sqlalchemy import SQLAlchemyAttemptStore, login_attempts_table
+
+attempts = SQLAlchemyAttemptStore(login_attempts_table(metadata), async_session_factory=async_session)
+router = MyLoginViews(templates=..., identity_provider=..., throttle=LoginThrottle(attempts)).router()
+```
+
+- Failures count against the account (the user ID, ignoring case and spaces) **and** the client address, so neither
+  one guesser trying many accounts nor many clients trying one account gets unlimited tries. By default 5 failures
+  within 15 minutes lock a key for 15 minutes.
+- A locked-out attempt, including the failure that trips the lock, re-renders the sign-in page with status 429, a
+  `Retry-After` header and the `error` "Too many failed sign-ins. Try again in N minutes." `authenticate()` isn't
+  called while locked. The message is the same whether or not the account exists.
+- A successful login clears the account's count, not the client's.
+- The client address is `request.client.host`. Behind a reverse proxy, set `TRUSTED_PROXIES` so `register_core`'s
+  proxy-headers middleware puts the real client there; otherwise every user shares the proxy's address. Override
+  `client_address(request)` for another source.
+- `InMemoryAttemptStore` suits a single process only. Call `throttle.prune()` now and then (e.g. from a scheduled
+  job) to delete expired records.
+
+**Sign-up: `RegisterViews`** (`greentechhub_fastapi.auth.RegisterViews`) is the same idea for self-service sign-up:
+`GET`/`POST /register`, with only storing the new user left to fill in:
+
+```python
+from greentechhub_core.security import hash_password
+from greentechhub_fastapi.auth import RegisterViews, RegistrationError, resolve_dependency
+
+class MyRegisterViews(RegisterViews):
+    async def create_user(self, user_id: str, password: str) -> Identity:
+        async with resolve_dependency(app, get_session) as session:
+            if await session.get(User, user_id):
+                raise RegistrationError({"user_id": ["That user ID is taken."]})
+            session.add(User(id=user_id, password_hash=hash_password(password)))
+            await session.commit()
+        return Identity(subject=user_id, username=user_id, email=None, groups=[], claims={})
+
+app.include_router(MyRegisterViews(templates=..., identity_provider=...).router())
+```
+
+- It checks the form first: a user ID (spaces trimmed), a password of at least `min_password_length` (8), and a
+  matching `password_confirm`. Only then does it call `create_user`. Raise `RegistrationError({field: [message]})`
+  for an expected refusal; let real failures propagate.
+- A refused sign-up re-renders with status 422. A successful one signs the new user straight in, like a login: the
+  session cookie, then the landing page (or `redirect_url`).
+- `register_template` defaults to `"register_page.html"` (greentechhub-ui's sign-up page, in its release after
+  v0.14; set your own template until you're on it). It gets `register_url`, `login_url` and
+  `min_password_length` on every render, plus `errors` (`{field: [message]}`) and the submitted `user_id` after a
+  refusal. The password is never sent back.
+- `is_open(request)` decides whether sign-up is open. By default it's open while `signup_open` (`True`) is set and,
+  when it's registered through `register_settings`, core's `self_signup_setting()` is on. That makes sign-up an
+  app setting an admin can switch off from the settings page:
+
+  ```python
+  from greentechhub_core.settings.builtins import self_signup_setting
+
+  register_settings(app, settings, registry=SettingsRegistry([
+      self_signup_setting(edit_permission="settings.manage"),  # default=False for invite-only
+  ]))
+  ```
+
+  `signup_open = False` closes sign-up whatever the setting says; override `is_open` for another rule, such as a
+  feature flag. While closed, both routes answer 404. `settings.self_signup_open(request)` gives the same answer for
+  your own routes.
+
+**Password reset: `PasswordResetViews`** (`greentechhub_fastapi.auth.PasswordResetViews`) emails a single-use link
+(greentechhub-core's `OneTimeTokens`) and lets the person choose a new password. Finding the account and storing the
+password are left to fill in:
+
+```python
+from greentechhub_core.security import OneTimeTokens, hash_password
+from greentechhub_core.sqlalchemy import SQLAlchemyTokenStore, one_time_tokens_table
+from greentechhub_fastapi.auth import PasswordResetViews
+
+class MyPasswordResetViews(PasswordResetViews):
+    async def find_account(self, identifier: str) -> tuple[str, str] | None:
+        async with resolve_dependency(app, get_session) as session:
+            user = await find_user_by_id_or_email(session, identifier)
+        return (user.id, user.email) if user is not None and user.email else None
+
+    async def set_password(self, subject: str, password: str) -> None:
+        async with resolve_dependency(app, get_session) as session:
+            (await session.get(User, subject)).password_hash = hash_password(password)
+            await session.commit()
+
+tokens = OneTimeTokens(SQLAlchemyTokenStore(one_time_tokens_table(metadata), async_session_factory=async_session))
+app.include_router(MyPasswordResetViews(templates=templates, tokens=tokens).router())
+login_views.forgot_password_url = "/forgot-password"   # a "Forgot password?" link on the sign-in page
+```
+
+- It sends through [`register_email`](registration.md#email). Pass `base_url` there so the link is absolute.
+- `GET`/`POST /forgot-password` takes a user ID or email. A matching account is emailed a link to
+  `/reset-password/{token}`, valid for `token_lifetime` (an hour). **The page answers the same whether or not an
+  account matched, and a mail problem is logged, not shown**, so it never reveals who has an account. Override
+  `reset_email(address, link)` for your own wording.
+- `GET`/`POST /reset-password/{token}` shows the "choose a new password" form, checks the length
+  (`min_password_length`, 8) and the confirmation, then uses the token up and calls `set_password`. An unknown,
+  expired or used link shows the invalid page (400). Requesting a new link revokes the older ones. The person isn't
+  signed in: they sign in with the new password. Sessions already issued stay valid (stateless JWTs).
+- Pass `throttle=LoginThrottle(...)` to cap reset emails per account and per client: every request counts, and a
+  capped one gets 429 with `Retry-After` before any email.
+- Templates default to greentechhub-ui's `forgot_password_page.html` and `reset_password_page.html` (still to come
+  there). The forgot page gets `forgot_url` and `login_url`, plus `sent` and `identifier` after a request or `errors`
+  (422). The reset page gets `action`, `login_url` and `min_password_length`, plus `errors` (422), `done`, or
+  `invalid` with `forgot_url`.
+- Call `tokens.prune()` now and then (e.g. from a scheduled job) to delete used and expired tokens.
+
+**Email verification: `EmailVerificationViews`** (`greentechhub_fastapi.auth.EmailVerificationViews`) confirms that
+an address belongs to the person who gave it, with an emailed single-use link. Recording that it's confirmed, and
+finding who still needs to confirm, are left to fill in:
+
+```python
+from greentechhub_fastapi.auth import EmailVerificationViews
+
+class MyEmailVerificationViews(EmailVerificationViews):
+    async def mark_verified(self, subject: str) -> None:
+        async with resolve_dependency(app, get_session) as session:
+            (await session.get(User, subject)).email_verified = True
+            await session.commit()
+
+    async def find_unverified(self, identifier: str) -> tuple[str, str] | None:
+        async with resolve_dependency(app, get_session) as session:
+            user = await find_user_by_id_or_email(session, identifier)
+        ok = user is not None and user.email and not user.email_verified
+        return (user.id, user.email) if ok else None
+
+verification = MyEmailVerificationViews(templates=templates, tokens=tokens)   # OneTimeTokens, as for reset
+app.include_router(verification.router())
+
+# wherever the service sets an address: its own sign-up, or SettingsViews' save_profile
+await verification.send_link(request, user.id, user.email)
+```
+
+- `send_link(request_or_app, subject, address)` emails a link to `/verify-email/{token}`, valid for
+  `token_lifetime` (48 hours), through [`register_email`](registration.md#email). Mail errors propagate, so the
+  caller knows. A new link revokes the older ones. Override `verify_email(address, link)` for your own wording.
+- `GET /verify-email/{token}` uses the link up and calls `mark_verified`. It runs on a GET so one click is enough. A
+  mail scanner that prefetches the link only confirms the address the person gave. An unknown, expired or used link
+  shows the invalid page (400), which links to the resend form.
+- `GET`/`POST /verify-email/resend` takes a user ID or email and sends a new link to an account that still needs
+  confirming. As with password reset, the page is the same whether or not one matched, mail problems are logged,
+  and `throttle=` caps the emails (429 with `Retry-After`).
+- Templates default to greentechhub-ui's `verify_email_page.html` and `verify_email_resend_page.html` (still to come
+  there). The link page gets `login_url` plus `done`, or `invalid` and `resend_url`. The resend page gets
+  `resend_url` and `login_url`, plus `sent` and `identifier`, or `errors`.
+
+**Gating sign-in.** To keep unconfirmed accounts out, override `LoginViews.refuse_sign_in(identity)`. A message it
+returns re-renders the sign-in page as the `error`, with status 403 and no session. Set `verify_resend_url` (e.g.
+`"/verify-email/resend"`) and that page also gets it, to offer the link again:
+
+```python
+class MyLoginViews(LoginViews):
+    verify_resend_url = "/verify-email/resend"
+
+    async def refuse_sign_in(self, identity: Identity) -> str | None:
+        user = await load_user(identity.subject)
+        return None if user.email_verified else "Confirm your email address first."
+```
+
 ## Requiring a login on page routes
 
 `get_current_user` resolves to `None` for anonymous callers, and `dependencies.get_current_identity` turns that into a 401 JSON envelope — right for APIs, wrong for browser pages. For server-rendered routes use `dependencies.require_page_identity(login_url="/login")`:

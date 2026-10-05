@@ -17,8 +17,11 @@ an explicit fastapi.HTTPException(422, ...), which does produce a clean,
 documented error response. Do not "simplify" this back into a validator.
 """
 
+from collections.abc import Iterable, Mapping
+
 from fastapi import HTTPException, Query
 from fastapi_pagination import Params
+from greentechhub_core.query import FilterField, validate_filters
 from greentechhub_core.query.types import PageRequest
 
 from greentechhub_fastapi.query.parsing import parse_filter_json, parse_filters, parse_sort
@@ -37,7 +40,14 @@ class PageParams(Params):
         '{"and": [...]} / {"or": [...]} groups.',
     )
 
-    def to_page_request(self) -> PageRequest:
+    def to_page_request(
+        self,
+        fields: Iterable[FilterField] | Mapping[str, FilterField] | None = None,
+        *,
+        max_depth: int = 3,
+        max_filters: int = 20,
+        max_values: int = 100,
+    ) -> PageRequest:
         """Translate this request's page/size/sort/filter into a PageRequest.
 
         `filter` (the flat string) and `filters` (JSON, with and/or groups)
@@ -47,10 +57,20 @@ class PageParams(Params):
         underlying ValueError's message as `detail` — page/size are already
         validated natively by the inherited Params fields' ge/le constraints,
         so no equivalent handling is needed for them here.
+
+        With `fields` (core FilterFields), the clauses also go through core's
+        validate_filters: only those fields, the operators each type takes,
+        values that fit (converted to numbers, dates and bools), and the
+        limits given. A problem raises core's BadRequestError
+        ("invalid_filters", a {path, field, message} detail per clause), which
+        the registered exception handlers answer 400.
         """
         try:
             sort = parse_sort(self.sort)
             filters = [*parse_filters(self.filter), *parse_filter_json(self.filters)]
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if fields is not None:
+            filters = validate_filters(filters, fields, max_depth=max_depth,
+                                       max_filters=max_filters, max_values=max_values)
         return PageRequest(page=self.page, size=self.size, sort=sort, filters=filters)

@@ -9,7 +9,9 @@ Opt-in like every register_* call. It:
     user, granted permissions and effective settings for
     settings.settings_context (the Jinja2Templates context processor);
   - mounts `views` (a SettingsViews) when given, which also turns on the
-    user menu's Settings link and the theme toggle's server save.
+    user menu's Settings link and the theme toggle's server save, and
+    hands its load_profile hook (if any) to the middleware for the user
+    menu's display name.
 
 `manage_permission` gates the App section and its save; it needs
 register_permissions to have run first (a bootstrap admin from
@@ -67,6 +69,7 @@ def register_settings(
             manage_permission=permission,
             logout_url=logout_url,
             url=views.url if views is not None else None,
+            load_profile=views.load_profile if views is not None else None,
         ),
     )
     # Appended, not add_middleware (which prepends): the last entry is the
