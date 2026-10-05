@@ -17,8 +17,6 @@ consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.
   rest of login hardening, throttling and one generic error, is done)
 
 ### Notifications & email (M2)
-- [ ] Password reset — forgot-password and reset-by-token views on core's single-use tokens, emailed with
-  `send_email`
 - [ ] Email verification — optional; gates login until the address is confirmed
 
 ### Ideas — not scheduled
