@@ -75,6 +75,8 @@ class MyLoginViews(LoginViews):
 Set `register_url` (e.g. `"/register"`) when the service offers sign-up: `LoginViews` then also passes `register_url`
 to the template, so the sign-in page can link to "Create account". Left at `None`, nothing changes. The link is
 also left out while core's self-signup setting (below) is off.
+Set `forgot_password_url` (e.g. `"/forgot-password"`, see `PasswordResetViews` below) and the template gets it too,
+for a "Forgot password?" link.
 
 **Login throttling.** Pass core's `LoginThrottle` as `throttle=` to lock out repeated failed logins
 ([core docs](https://github.com/GreenMachine582/greentechhub-core/blob/main/docs/modules.md#login-throttling)):
@@ -143,6 +145,48 @@ app.include_router(MyRegisterViews(templates=..., identity_provider=...).router(
   `signup_open = False` closes sign-up whatever the setting says; override `is_open` for another rule, such as a
   feature flag. While closed, both routes answer 404. `settings.self_signup_open(request)` gives the same answer for
   your own routes.
+
+**Password reset: `PasswordResetViews`** (`greentechhub_fastapi.auth.PasswordResetViews`) emails a single-use link
+(greentechhub-core's `OneTimeTokens`) and lets the person choose a new password. Finding the account and storing the
+password are left to fill in:
+
+```python
+from greentechhub_core.security import OneTimeTokens, hash_password
+from greentechhub_core.sqlalchemy import SQLAlchemyTokenStore, one_time_tokens_table
+from greentechhub_fastapi.auth import PasswordResetViews
+
+class MyPasswordResetViews(PasswordResetViews):
+    async def find_account(self, identifier: str) -> tuple[str, str] | None:
+        async with resolve_dependency(app, get_session) as session:
+            user = await find_user_by_id_or_email(session, identifier)
+        return (user.id, user.email) if user is not None and user.email else None
+
+    async def set_password(self, subject: str, password: str) -> None:
+        async with resolve_dependency(app, get_session) as session:
+            (await session.get(User, subject)).password_hash = hash_password(password)
+            await session.commit()
+
+tokens = OneTimeTokens(SQLAlchemyTokenStore(one_time_tokens_table(metadata), async_session_factory=async_session))
+app.include_router(MyPasswordResetViews(templates=templates, tokens=tokens).router())
+login_views.forgot_password_url = "/forgot-password"   # a "Forgot password?" link on the sign-in page
+```
+
+- It sends through [`register_email`](registration.md#email). Pass `base_url` there so the link is absolute.
+- `GET`/`POST /forgot-password` takes a user ID or email. A matching account is emailed a link to
+  `/reset-password/{token}`, valid for `token_lifetime` (an hour). **The page answers the same whether or not an
+  account matched, and a mail problem is logged, not shown**, so it never reveals who has an account. Override
+  `reset_email(address, link)` for your own wording.
+- `GET`/`POST /reset-password/{token}` shows the "choose a new password" form, checks the length
+  (`min_password_length`, 8) and the confirmation, then uses the token up and calls `set_password`. An unknown,
+  expired or used link shows the invalid page (400). Requesting a new link revokes the older ones. The person isn't
+  signed in: they sign in with the new password. Sessions already issued stay valid (stateless JWTs).
+- Pass `throttle=LoginThrottle(...)` to cap reset emails per account and per client: every request counts, and a
+  capped one gets 429 with `Retry-After` before any email.
+- Templates default to greentechhub-ui's `forgot_password_page.html` and `reset_password_page.html` (still to come
+  there). The forgot page gets `forgot_url` and `login_url`, plus `sent` and `identifier` after a request or `errors`
+  (422). The reset page gets `action`, `login_url` and `min_password_length`, plus `errors` (422), `done`, or
+  `invalid` with `forgot_url`.
+- Call `tokens.prune()` now and then (e.g. from a scheduled job) to delete used and expired tokens.
 
 ## Requiring a login on page routes
 

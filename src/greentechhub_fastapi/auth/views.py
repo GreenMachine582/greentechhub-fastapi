@@ -93,6 +93,11 @@ class LoginViews(ABC):
     #: is_open() rule should keep this in step with it.
     register_url: str | None = None
 
+    #: The forgot-password page (PasswordResetViews.forgot_url) when the service
+    #: offers one; passed to the template as `forgot_password_url` for a
+    #: "Forgot password?" link. None (the default) leaves it out.
+    forgot_password_url: str | None = None
+
     def __init__(
         self,
         *,
@@ -138,6 +143,8 @@ class LoginViews(ABC):
         context = {"login_url": self.login_url, **extra}
         if self.register_url and await self_signup_open(request):
             context["register_url"] = self.register_url
+        if self.forgot_password_url:
+            context["forgot_password_url"] = self.forgot_password_url
         return context
 
     async def _login_form(self, request: Request):
