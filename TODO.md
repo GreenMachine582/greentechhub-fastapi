@@ -17,10 +17,8 @@ consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.
   rest of login hardening, throttling and one generic error, is done)
 
 ### Notifications & email (M2)
-- [ ] Email delivery adapter — `register_email` over core's `greentechhub_core.email` (v0.11: a
-  `SettingsEmailSender` reading `smtp_settings`, keyed by `settings_cipher`), used by the views below and by
-  `notify` for the "email" channel of the delivery preferences (people can choose it, but nothing is sent yet)
-- [ ] Password reset — forgot-password and reset-by-token views on core's single-use tokens
+- [ ] Password reset — forgot-password and reset-by-token views on core's single-use tokens, emailed with
+  `send_email`
 - [ ] Email verification — optional; gates login until the address is confirmed
 
 ### Data & forms
