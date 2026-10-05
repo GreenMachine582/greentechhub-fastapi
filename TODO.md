@@ -11,9 +11,6 @@
 Cross-repo order (with greentechhub-core and greentechhub-ui): Accounts (M1) → Notifications & email (M2) →
 consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.0.
 
-### Notifications & email (M2)
-- [ ] `SettingsViews`' profile: a changed email sends `send_link`, and isn't treated as confirmed until then
-
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
 one `register_*` call.

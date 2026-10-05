@@ -247,8 +247,24 @@ since a later context processor's key replaces this one's.
   display name and an email. Its route strips both and checks that the display name has at most
   `max_display_name_length` (80) characters and the email looks like an address or is empty, then calls yours. Raise
   `ProfileError({"email": ["That email is in use."]})` for an expected refusal. The answer is 422 with the section's
-  errors and the submitted values, or 200 with the saved section and a "Profile saved" toast. The email isn't verified
-  yet (that's the planned email verification).
+  errors and the submitted values, or 200 with the saved section and a "Profile saved" toast.
+
+  **Confirming a changed email.** Pass `verification=` (your `EmailVerificationViews`, see
+  [auth.md](auth.md)) and, after a save that changes the email to a new non-empty address (ignoring case), that
+  address is sent a confirmation link. The toast becomes "Profile saved. We've emailed a link to confirm …". A mail
+  problem is logged, and the toast says the email couldn't be sent; the profile is saved either way. Whether an
+  address counts as confirmed is yours: `save_profile` marks it unconfirmed when it changes, and `mark_verified` marks
+  it confirmed again.
+
+  ```python
+  async def save_profile(user: Identity, profile: Profile) -> None:
+      async with resolve_dependency(app, get_session) as session:
+          row = await session.get(User, user.subject)
+          if profile.email.casefold() != (row.email or "").casefold():
+              row.email_verified = False
+          row.display_name, row.email = profile.display_name, profile.email or None
+          await session.commit()
+  ```
 
   `register_settings` hands `load_profile` to the page-context middleware, which calls it once per page request for a
   signed-in user (keep it a cheap lookup), and a display name reaches templates as `user_display_name`, for the user
@@ -260,7 +276,8 @@ since a later context processor's key replaces this one's.
           row = await session.get(User, user.subject)
       return Profile(display_name=row.display_name or "", email=row.email or "")
 
-  views = SettingsViews(templates=templates, load_profile=load_profile, save_profile=save_profile)
+  views = SettingsViews(templates=templates, load_profile=load_profile, save_profile=save_profile,
+                        verification=verification)   # optional: confirm a changed email
   ```
 - **Change password** (opt-in): pass `change_password`, an async `(user, current, new) -> bool` that returns `False`
   when `current` isn't the user's password and otherwise stores `new` (hashing it is yours, as with `LoginViews`).
