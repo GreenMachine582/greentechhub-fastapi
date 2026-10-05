@@ -5,6 +5,28 @@ version). From v0.8.0 on, entries are written by [release-please](https://github
 from conventional commits; the same notes are published as
 [GitHub Releases](https://github.com/GreenMachine582/greentechhub-fastapi/releases).
 
+## [0.12.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.11.0...v0.12.0) (2026-10-05)
+
+
+### Features
+
+* **auth:** email verification ([#46](https://github.com/GreenMachine582/greentechhub-fastapi/issues/46)) ([5ec94d6](https://github.com/GreenMachine582/greentechhub-fastapi/commit/5ec94d68cda914ab49850fe806289dea68f452ac))
+* **auth:** login throttling on LoginViews ([#39](https://github.com/GreenMachine582/greentechhub-fastapi/issues/39)) ([e1832c6](https://github.com/GreenMachine582/greentechhub-fastapi/commit/e1832c65b2a9a43c26040b4727e3e3a03d26d1e0))
+* **auth:** password reset views ([#45](https://github.com/GreenMachine582/greentechhub-fastapi/issues/45)) ([d7898fe](https://github.com/GreenMachine582/greentechhub-fastapi/commit/d7898fe554c4092c0d91796b9b143cfa86427c67))
+* **auth:** RegisterViews for self-service sign-up ([#35](https://github.com/GreenMachine582/greentechhub-fastapi/issues/35)) ([430657d](https://github.com/GreenMachine582/greentechhub-fastapi/commit/430657d93f6fac08c05fd03d3afef743cf3a5a48))
+* **auth:** sign-up follows core's self-signup setting ([#38](https://github.com/GreenMachine582/greentechhub-fastapi/issues/38)) ([8652a7e](https://github.com/GreenMachine582/greentechhub-fastapi/commit/8652a7e0b9c7872a04b9c765db66b3a17db09c3e))
+* **email:** register_email and notify by email ([#43](https://github.com/GreenMachine582/greentechhub-fastapi/issues/43)) ([ee9ba33](https://github.com/GreenMachine582/greentechhub-fastapi/commit/ee9ba336e9755f6f6d99b497031a4bdb71aa58e7))
+* **notifications:** register_notifications and notify ([#41](https://github.com/GreenMachine582/greentechhub-fastapi/issues/41)) ([98a6543](https://github.com/GreenMachine582/greentechhub-fastapi/commit/98a65432d38c8af457dbcaeaa01d87489ee0f947))
+* **query:** validate filters against allowed fields ([#44](https://github.com/GreenMachine582/greentechhub-fastapi/issues/44)) ([38d35bf](https://github.com/GreenMachine582/greentechhub-fastapi/commit/38d35bf6644fda23c668362c21b66aa1c8660a8a))
+* **settings:** a change-password section ([#36](https://github.com/GreenMachine582/greentechhub-fastapi/issues/36)) ([86cd71a](https://github.com/GreenMachine582/greentechhub-fastapi/commit/86cd71a406ac8b35f141b014ceadeff8da729794))
+* **settings:** a profile section ([#40](https://github.com/GreenMachine582/greentechhub-fastapi/issues/40)) ([f18056b](https://github.com/GreenMachine582/greentechhub-fastapi/commit/f18056b1cf2e71fea88929ed69f9596f6277df29))
+
+
+### Build
+
+* **deps:** greentechhub-core v0.10.0 ([#37](https://github.com/GreenMachine582/greentechhub-fastapi/issues/37)) ([c1db78b](https://github.com/GreenMachine582/greentechhub-fastapi/commit/c1db78b191794280218a8993bcf251b140ce5e94))
+* **deps:** greentechhub-core v0.11.0 ([#42](https://github.com/GreenMachine582/greentechhub-fastapi/issues/42)) ([e3ba1c0](https://github.com/GreenMachine582/greentechhub-fastapi/commit/e3ba1c0e1797deaf2b53b199654bc68515447fef))
+
 ## [0.11.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.10.0...v0.11.0) (2026-10-03)
 
 
