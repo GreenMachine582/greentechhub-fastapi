@@ -37,13 +37,15 @@ register_auth installed, and an admin can come from ROLE_BOOTSTRAP
 """
 
 import inspect
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 from fastapi.templating import Jinja2Templates
+from greentechhub_core.email import EmailDeliveryError, EmailNotConfiguredError
 from greentechhub_core.identity import Identity
 from greentechhub_core.permissions import Permission
 from greentechhub_core.settings import (
@@ -66,6 +68,11 @@ from greentechhub_fastapi.dependencies.identity import require_page_identity
 from greentechhub_fastapi.email import email_looks_valid
 from greentechhub_fastapi.htmx import _toast_trigger
 from greentechhub_fastapi.permissions import _GRANTED_STATE_KEY, RESOLVER_STATE_KEY
+
+if TYPE_CHECKING:
+    from greentechhub_fastapi.auth.verify import EmailVerificationViews
+
+logger = logging.getLogger(__name__)
 
 SETTINGS_STATE_KEY = "gth_settings"
 THEME_KEY = "ui.theme"
@@ -320,7 +327,12 @@ class SettingsViews:
     the saved section and a "Profile saved" toast. register_settings hands
     load_profile to the page-context middleware, which calls it once per
     page request for a signed-in user, so keep it a cheap lookup; the
-    display name reaches templates as `user_display_name`.
+    display name reaches templates as `user_display_name`. Pass
+    `verification` (an EmailVerificationViews) and a changed, non-empty email
+    is sent a confirmation link after the save, with the toast saying so; a
+    mail problem is logged, not raised. Whether an address counts as
+    confirmed is the service's: save_profile should mark it unconfirmed when
+    it changes, and mark_verified confirms it.
 
     Templates default to greentechhub-ui's ready-made settings_page.html and
     settings_section.html; override the names to use your own.
@@ -349,6 +361,7 @@ class SettingsViews:
         change_password: Callable[[Identity, str, str], Awaitable[bool]] | None = None,
         load_profile: Callable[[Identity], Awaitable[Profile]] | None = None,
         save_profile: Callable[[Identity, Profile], Awaitable[None]] | None = None,
+        verification: "EmailVerificationViews | None" = None,
     ) -> None:
         if (load_profile is None) != (save_profile is None):
             raise ValueError("pass load_profile and save_profile together")
@@ -356,6 +369,7 @@ class SettingsViews:
         self._change_password = change_password
         self.load_profile = load_profile
         self._save_profile = save_profile
+        self._verification = verification
         self._page_identity = require_page_identity(self.login_url)
 
     def router(self) -> APIRouter:
@@ -560,7 +574,10 @@ class SettingsViews:
             email=str(form.get("email") or "").strip(),
         )
         errors = self._check_profile(profile)
+        before = None
         if not errors:
+            if self._verification is not None and self.load_profile is not None:
+                before = await self.load_profile(user)
             try:
                 await self._save_profile(user, profile)
             except ProfileError as exc:
@@ -569,10 +586,26 @@ class SettingsViews:
             return self._render_section(
                 request, self._profile_section(profile, errors), status_code=422
             )
+        message = "Profile saved"
+        changed = before is not None and profile.email and (
+            profile.email.casefold() != before.email.strip().casefold()
+        )
+        if changed and self._verification is not None:
+            message = await self._confirm_email(request, user, profile.email)
         return self._render_section(
             request, self._profile_section(profile),
-            headers={"HX-Trigger": _toast_trigger("Profile saved", {})},
+            headers={"HX-Trigger": _toast_trigger(message, {})},
         )
+
+    async def _confirm_email(self, request: Request, user: Identity, email: str) -> str:
+        """Send the changed address its confirmation link; the toast to show."""
+        assert self._verification is not None
+        try:
+            await self._verification.send_link(request, user.subject, email)
+        except (EmailDeliveryError, EmailNotConfiguredError, RuntimeError, ValueError) as exc:
+            logger.warning("confirmation email for %s not sent: %s", user.subject, exc)
+            return "Profile saved, but the confirmation email couldn't be sent."
+        return f"Profile saved. We've emailed a link to confirm {email}."
 
     # change password
 
