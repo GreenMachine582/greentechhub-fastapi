@@ -5,6 +5,15 @@ version). From v0.8.0 on, entries are written by [release-please](https://github
 from conventional commits; the same notes are published as
 [GitHub Releases](https://github.com/GreenMachine582/greentechhub-fastapi/releases).
 
+## [0.13.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.12.0...v0.13.0) (2026-10-05)
+
+
+### Features
+
+* **auth:** opt-in CSRF on the auth forms ([#49](https://github.com/GreenMachine582/greentechhub-fastapi/issues/49)) ([cfc597a](https://github.com/GreenMachine582/greentechhub-fastapi/commit/cfc597a6910095816ab75f26f2eca4ca8ffbd224))
+* **auth:** sign-up can ask for an email and confirm it ([#50](https://github.com/GreenMachine582/greentechhub-fastapi/issues/50)) ([3754e41](https://github.com/GreenMachine582/greentechhub-fastapi/commit/3754e41d8aa5c5c292ee3ebb403f604692afc6d7))
+* **settings:** confirm a changed profile email ([#51](https://github.com/GreenMachine582/greentechhub-fastapi/issues/51)) ([9329323](https://github.com/GreenMachine582/greentechhub-fastapi/commit/93293235c7c3786bc8ca6ae9066765605e148d4e))
+
 ## [0.12.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.11.0...v0.12.0) (2026-10-05)
 
 
