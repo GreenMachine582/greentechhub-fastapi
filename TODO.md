@@ -11,12 +11,16 @@
 Cross-repo order (with greentechhub-core and greentechhub-ui): Accounts (M1) → Notifications & email (M2) →
 consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.0.
 
+### Notifications & email (M2)
+- [ ] `settings_context` passes `notifications_url` (the `NotificationViews` mount) when `register_notifications`
+  mounted views, so greentechhub-ui's navbar bell (v0.15+) appears with no service code
+
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
 one `register_*` call.
 - `register_admin(app)` — an "Admin" nav group collecting the admin views below, gated through nav permissions
-- Users admin — list, search, disable, force a password reset, assign roles inline (builds on `RoleAdminViews`;
-  needed once register lands)
+- Users admin — list, search, disable, force a password reset, assign roles inline (builds on `RoleAdminViews`
+  and `RegisterViews`)
 - System status page — core health checks as a page (status, last checked, response time), admin-only with an
   optional public summary
 - Feature flags page — see and toggle flags per app, user or group (core's settings-backed provider)
