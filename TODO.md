@@ -17,7 +17,9 @@ consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.
   rest of login hardening, throttling and one generic error, is done)
 
 ### Notifications & email (M2)
-- [ ] Email verification — optional; gates login until the address is confirmed
+- [ ] `RegisterViews`: an optional email field, emailing `EmailVerificationViews.send_link` after `create_user`
+  (and not signing in until it's confirmed, when the service gates sign-in)
+- [ ] `SettingsViews`' profile: a changed email sends `send_link`, and isn't treated as confirmed until then
 
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,

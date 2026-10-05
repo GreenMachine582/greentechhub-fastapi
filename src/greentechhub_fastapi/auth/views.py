@@ -68,6 +68,10 @@ class LoginViews(ABC):
     account and by client address: a locked-out attempt is answered 429 with
     Retry-After before authenticate() runs. None (the default) throttles
     nothing.
+
+    Override `refuse_sign_in(identity)` to turn away a correct password, e.g.
+    until the email address is confirmed (EmailVerificationViews): its
+    message re-renders the sign-in page with status 403 and no session.
     """
 
     #: Template name resolved against the Jinja2Templates instance passed to
@@ -98,6 +102,11 @@ class LoginViews(ABC):
     #: "Forgot password?" link. None (the default) leaves it out.
     forgot_password_url: str | None = None
 
+    #: EmailVerificationViews' resend form (`{verify_url}/resend`), passed to
+    #: the template as `verify_resend_url` when refuse_sign_in turns someone
+    #: away, so the page can offer to send the link again.
+    verify_resend_url: str | None = None
+
     def __init__(
         self,
         *,
@@ -108,6 +117,13 @@ class LoginViews(ABC):
         self._templates = templates
         self._identity_provider = identity_provider
         self._throttle = throttle
+
+    async def refuse_sign_in(self, identity: Identity) -> str | None:
+        """A reason to turn `identity` away after a correct password, shown as
+        the sign-in error (status 403, no session), or None to sign them in.
+        None by default; e.g. "Confirm your email address first." until
+        it's verified."""
+        return None
 
     def client_address(self, request: Request) -> str | None:
         """The address the throttle counts a client by: the request's client
@@ -205,7 +221,15 @@ class LoginViews(ABC):
         if throttle:
             # The account only: one good login mustn't wipe a client's count.
             await throttle.record_success(account_key(user_id))
-        token =self._identity_provider.issue(identity)
+        if (refusal := await self.refuse_sign_in(identity)) is not None:
+            extra = {"verify_resend_url": self.verify_resend_url} if self.verify_resend_url else {}
+            return self._templates.TemplateResponse(
+                request,
+                self.login_template,
+                await self._context(request, error=refusal, user_id=user_id, **extra),
+                status_code=403,
+            )
+        token = self._identity_provider.issue(identity)
         url = await landing_url(request, identity, fallback=self.redirect_url)
         response = RedirectResponse(url=url, status_code=303)
         create_session_cookie(response, token)

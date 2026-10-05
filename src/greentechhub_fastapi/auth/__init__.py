@@ -3,9 +3,11 @@ from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.auth.register import RegisterViews, RegistrationError
 from greentechhub_fastapi.auth.reset import PasswordResetViews
 from greentechhub_fastapi.auth.resolve import resolve_dependency
+from greentechhub_fastapi.auth.verify import EmailVerificationViews
 from greentechhub_fastapi.auth.views import LoginViews
 
 __all__ = [
+    "EmailVerificationViews",
     "LoginViews",
     "PasswordResetViews",
     "RegisterViews",

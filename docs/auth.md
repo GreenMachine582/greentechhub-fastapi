@@ -188,6 +188,58 @@ login_views.forgot_password_url = "/forgot-password"   # a "Forgot password?" li
   `invalid` with `forgot_url`.
 - Call `tokens.prune()` now and then (e.g. from a scheduled job) to delete used and expired tokens.
 
+**Email verification: `EmailVerificationViews`** (`greentechhub_fastapi.auth.EmailVerificationViews`) confirms that
+an address belongs to the person who gave it, with an emailed single-use link. Recording that it's confirmed, and
+finding who still needs to confirm, are left to fill in:
+
+```python
+from greentechhub_fastapi.auth import EmailVerificationViews
+
+class MyEmailVerificationViews(EmailVerificationViews):
+    async def mark_verified(self, subject: str) -> None:
+        async with resolve_dependency(app, get_session) as session:
+            (await session.get(User, subject)).email_verified = True
+            await session.commit()
+
+    async def find_unverified(self, identifier: str) -> tuple[str, str] | None:
+        async with resolve_dependency(app, get_session) as session:
+            user = await find_user_by_id_or_email(session, identifier)
+        ok = user is not None and user.email and not user.email_verified
+        return (user.id, user.email) if ok else None
+
+verification = MyEmailVerificationViews(templates=templates, tokens=tokens)   # OneTimeTokens, as for reset
+app.include_router(verification.router())
+
+# wherever the service sets an address: its own sign-up, or SettingsViews' save_profile
+await verification.send_link(request, user.id, user.email)
+```
+
+- `send_link(request_or_app, subject, address)` emails a link to `/verify-email/{token}`, valid for
+  `token_lifetime` (48 hours), through [`register_email`](registration.md#email). Mail errors propagate, so the
+  caller knows. A new link revokes the older ones. Override `verify_email(address, link)` for your own wording.
+- `GET /verify-email/{token}` uses the link up and calls `mark_verified`. It runs on a GET so one click is enough. A
+  mail scanner that prefetches the link only confirms the address the person gave. An unknown, expired or used link
+  shows the invalid page (400), which links to the resend form.
+- `GET`/`POST /verify-email/resend` takes a user ID or email and sends a new link to an account that still needs
+  confirming. As with password reset, the page is the same whether or not one matched, mail problems are logged,
+  and `throttle=` caps the emails (429 with `Retry-After`).
+- Templates default to greentechhub-ui's `verify_email_page.html` and `verify_email_resend_page.html` (still to come
+  there). The link page gets `login_url` plus `done`, or `invalid` and `resend_url`. The resend page gets
+  `resend_url` and `login_url`, plus `sent` and `identifier`, or `errors`.
+
+**Gating sign-in.** To keep unconfirmed accounts out, override `LoginViews.refuse_sign_in(identity)`. A message it
+returns re-renders the sign-in page as the `error`, with status 403 and no session. Set `verify_resend_url` (e.g.
+`"/verify-email/resend"`) and that page also gets it, to offer the link again:
+
+```python
+class MyLoginViews(LoginViews):
+    verify_resend_url = "/verify-email/resend"
+
+    async def refuse_sign_in(self, identity: Identity) -> str | None:
+        user = await load_user(identity.subject)
+        return None if user.email_verified else "Confirm your email address first."
+```
+
 ## Requiring a login on page routes
 
 `get_current_user` resolves to `None` for anonymous callers, and `dependencies.get_current_identity` turns that into a 401 JSON envelope — right for APIs, wrong for browser pages. For server-rendered routes use `dependencies.require_page_identity(login_url="/login")`:
