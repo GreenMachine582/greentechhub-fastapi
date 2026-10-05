@@ -206,6 +206,7 @@ processor, turns that into greentechhub-ui's optional template keys:
 | `theme_mode` | signed in, and `ui.theme` is registered |
 | `theme_save_url`, `user_menu_items` (Settings) | signed in, and `views` were mounted |
 | `logout_url` | signed in, and `logout_url` was given |
+| `notifications_url` | signed in, and `register_notifications` mounted `views`: greentechhub-ui v0.15+ shows the navbar bell |
 | `user_display_name` | signed in, `views` have the profile hooks, and the user has set a display name |
 | `site_banners` | core's `site_banner_settings()` is registered and the message isn't empty: any visitor, signed in or not |
 
@@ -316,7 +317,7 @@ from greentechhub_fastapi.notifications import NotificationViews, notifications_
 
 store = SQLAlchemyNotificationStore(notifications_table(metadata), async_session_factory=async_session)
 register_notifications(app, settings, store=store, views=NotificationViews(templates=templates))
-nav_items = [..., notifications_nav_item()]  # greentechhub-ui NavItem with a live unread badge
+nav_items = [..., notifications_nav_item()]  # optional: a nav link with the same live unread badge
 
 # anywhere with the app at hand: a route, a background job
 await notify(app, user, toast("Sync finished", kind="success"), category="sync")

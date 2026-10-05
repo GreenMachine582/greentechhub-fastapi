@@ -67,6 +67,7 @@ from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.dependencies.identity import require_page_identity
 from greentechhub_fastapi.email import email_looks_valid
 from greentechhub_fastapi.htmx import _toast_trigger
+from greentechhub_fastapi.notifications import NOTIFICATIONS_STATE_KEY
 from greentechhub_fastapi.permissions import _GRANTED_STATE_KEY, RESOLVER_STATE_KEY
 
 if TYPE_CHECKING:
@@ -255,7 +256,9 @@ def settings_context(request: Request) -> dict[str, Any]:
 
     With SettingsViews' profile hooks, a signed-in user with a display name
     also gets `user_display_name`, for the user menu to show instead of
-    their user ID."""
+    their user ID. When register_notifications mounted NotificationViews,
+    a signed-in page gets `notifications_url` too, so greentechhub-ui's
+    navbar shows the notification bell."""
     if not getattr(request.state, _LOADED, False):
         return {}
     config = get_settings_config(request.app)
@@ -283,6 +286,9 @@ def settings_context(request: Request) -> dict[str, Any]:
             context["theme_save_url"] = f"{config.url}/theme"
     if config.logout_url:
         context["logout_url"] = config.logout_url
+    notifications = getattr(request.app.state, NOTIFICATIONS_STATE_KEY, None)
+    if notifications is not None and notifications.url:
+        context["notifications_url"] = notifications.url
     return context
 
 
