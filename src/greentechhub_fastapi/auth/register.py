@@ -25,6 +25,7 @@ from fastapi.templating import Jinja2Templates
 from greentechhub_core.identity import DevelopmentIdentityProvider, Identity
 
 from greentechhub_fastapi.auth.cookies import create_session_cookie
+from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
 
 
 class RegistrationError(Exception):
@@ -37,7 +38,7 @@ class RegistrationError(Exception):
         self.errors = {field: list(messages) for field, messages in errors.items()}
 
 
-class RegisterViews(ABC):
+class RegisterViews(CsrfProtected, ABC):
     """Subclass and implement `create_user()`, then mount `.router()`.
 
     Ships GET/POST `register_url`. A successful sign-up signs the new user in
@@ -127,9 +128,16 @@ class RegisterViews(ABC):
             errors["password_confirm"] = ["The passwords don't match."]
         return errors
 
+    def _render(self, request: Request, status_code: int = 200, **extra):
+        context = self._context(**self._csrf_context(request), **extra)
+        response = self._templates.TemplateResponse(
+            request, self.register_template, context, status_code=status_code
+        )
+        return self._with_csrf_cookie(request, response)
+
     async def _register_form(self, request: Request):
         await self._require_open(request)
-        return self._templates.TemplateResponse(request, self.register_template, self._context())
+        return self._render(request)
 
     async def _register_submit(
         self,
@@ -137,9 +145,12 @@ class RegisterViews(ABC):
         user_id: str = Form(""),
         password: str = Form(""),
         password_confirm: str = Form(""),
+        csrf_token: str = Form(""),
     ):
         await self._require_open(request)
         user_id = user_id.strip()
+        if self._csrf_refused(request, csrf_token):
+            return self._render(request, 403, errors={"__all__": [CSRF_REFUSED]}, user_id=user_id)
         errors = self._validate(user_id, password, password_confirm)
         identity = None
         if not errors:
@@ -148,12 +159,7 @@ class RegisterViews(ABC):
             except RegistrationError as exc:
                 errors = exc.errors
         if identity is None:
-            return self._templates.TemplateResponse(
-                request,
-                self.register_template,
-                self._context(errors=errors, user_id=user_id),
-                status_code=422,
-            )
+            return self._render(request, 422, errors=errors, user_id=user_id)
 
         # Imported here for the same reason as in LoginViews: settings imports
         # auth.dependency, whose package __init__ imports this module.
