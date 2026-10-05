@@ -21,10 +21,6 @@ consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.
   `send_email`
 - [ ] Email verification — optional; gates login until the address is confirmed
 
-### Data & forms
-- [ ] Query-builder validation — run greentechhub-ui's `gth_query_builder` JSON (via `parse_filter_json`) through
-  core's `validate_filters` (v0.11) against a page's `FilterField`s, like `TableState`'s `filter_params`
-
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
 one `register_*` call.

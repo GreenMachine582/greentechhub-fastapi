@@ -43,12 +43,20 @@ Malformed input (bad clause shape, unknown operator, non-bool is_null value, an
 empty in/not_in list) raises a plain ValueError — this file stays fastapi-free
 so it's testable without an app; the fastapi-touching layer (params.py) is
 responsible for turning that into an HTTP-visible error.
+
+validated_filter_json adds greentechhub-core's validate_filters (allowed
+fields, operators per type, values converted to their types) for a query
+builder's JSON posted in a form; it raises core's BadRequestError
+("invalid_filters") for any problem, malformed JSON included.
 """
 
 import json
+from collections.abc import Iterable, Mapping
 from typing import Any
 
+from greentechhub_core.query import FilterField, validate_filters
 from greentechhub_core.query.types import Filter, FilterGroup, Operator, Sort
+from greentechhub_core.types import BadRequestError
 
 _LIST_OPERATORS = {Operator.IN, Operator.NOT_IN}
 
@@ -121,6 +129,27 @@ def parse_filter_json(raw: str | None) -> list[Filter | FilterGroup]:
         raise ValueError(f"filters is not valid JSON: {exc.msg}") from None
     clauses = data if isinstance(data, list) else [data]
     return [_parse_clause(c, depth=1) for c in clauses]
+
+
+def validated_filter_json(
+    raw: str | None,
+    fields: Iterable[FilterField] | Mapping[str, FilterField],
+    *,
+    max_depth: int = 3,
+    max_filters: int = 20,
+    max_values: int = 100,
+) -> list[Filter | FilterGroup]:
+    """parse_filter_json, then greentechhub-core's validate_filters against
+    `fields`: for a query builder's JSON posted in a form field. Anything
+    wrong, malformed JSON included, raises one BadRequestError
+    ("invalid_filters"); a parse problem is a single detail with path None."""
+    try:
+        filters = parse_filter_json(raw)
+    except ValueError as exc:
+        raise BadRequestError(str(exc), code="invalid_filters",
+                              details=[{"path": None, "field": None, "message": str(exc)}]) from exc
+    return validate_filters(filters, fields, max_depth=max_depth, max_filters=max_filters,
+                            max_values=max_values)
 
 
 def _parse_clause(node: Any, *, depth: int) -> Filter | FilterGroup:
