@@ -63,6 +63,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.dependencies.identity import require_page_identity
+from greentechhub_fastapi.email import email_looks_valid
 from greentechhub_fastapi.htmx import _toast_trigger
 from greentechhub_fastapi.permissions import _GRANTED_STATE_KEY, RESOLVER_STATE_KEY
 
@@ -547,11 +548,7 @@ class SettingsViews:
             errors["display_name"] = [
                 f"Use at most {self.max_display_name_length} characters."
             ]
-        email = profile.email
-        local, at, domain = email.partition("@")
-        if email and (
-            not (local and at and domain) or "@" in domain or any(c.isspace() for c in email)
-        ):
+        if profile.email and not email_looks_valid(profile.email):
             errors["email"] = ["Enter an email address, like name@example.com."]
         return errors
 

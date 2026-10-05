@@ -12,8 +12,6 @@ Cross-repo order (with greentechhub-core and greentechhub-ui): Accounts (M1) →
 consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.0.
 
 ### Notifications & email (M2)
-- [ ] `RegisterViews`: an optional email field, emailing `EmailVerificationViews.send_link` after `create_user`
-  (and not signing in until it's confirmed, when the service gates sign-in)
 - [ ] `SettingsViews`' profile: a changed email sends `send_link`, and isn't treated as confirmed until then
 
 ### Ideas — not scheduled
