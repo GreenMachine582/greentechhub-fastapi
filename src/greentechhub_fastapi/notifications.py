@@ -4,7 +4,8 @@ NotificationStore.
 
 - notify: store a notice for one person, built from a greentechhub-ui
   toast() payload, honouring their delivery preference for its category
-  (core's notification_preferences, when register_settings has them).
+  (core's notification_preferences, when register_settings has them), and
+  email it when they chose email and register_email ran.
 - NotificationViews: the signed-in user's notifications page, a panel
   partial for a navbar dropdown, a live badge (gth_nav_badge's badge_url)
   and the mark-read / mark-all-read actions. Like SettingsViews it renders
@@ -18,6 +19,7 @@ Every route acts for the signed-in user only: the recipient is always
 """
 
 import json
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -25,6 +27,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from greentechhub_core.email import EmailDeliveryError, EmailNotConfiguredError, new_email
 from greentechhub_core.identity import Identity
 from greentechhub_core.notifications import (
     Notification,
@@ -35,6 +38,14 @@ from greentechhub_core.notifications import (
 
 from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.dependencies.identity import require_page_identity
+from greentechhub_fastapi.email import (
+    EMAIL_STATE_KEY,
+    absolute_url,
+    recipient_address,
+    send_email,
+)
+
+logger = logging.getLogger(__name__)
 
 NOTIFICATIONS_STATE_KEY = "gth_notifications"
 
@@ -75,15 +86,22 @@ async def notify(
     *,
     category: str = "general",
 ) -> Notification | None:
-    """Store a notice for `recipient` (an Identity, or a subject for code with
-    no Identity at hand, such as a scheduled job) and return it.
+    """Deliver a notice to `recipient` (an Identity, or a subject for code
+    with no Identity at hand, such as a scheduled job): store it for the
+    notification centre and/or email it. Returns the stored Notification, or
+    None when it wasn't stored (the person chose email only, or off).
 
     `payload` is a greentechhub-ui toast() detail, or the whole
     {"showToast": ...} value toast() returns. When register_settings has
     core's notification_preferences for `category`, the person's choice
-    decides: a choice without the in-app channel stores nothing and returns
-    None. The email channel isn't sent yet; that comes with the email
-    adapter.
+    decides the channels; otherwise it's in-app only.
+
+    The email channel needs register_email and an address (the Identity's
+    email, else register_email's address_for). The email's subject is the
+    title, else the message; its text is the message plus the action link,
+    made absolute with base_url. A failed or unconfigured send, or a missing
+    address, is logged as a warning and never raised: a mail problem mustn't
+    break the in-app notice or the caller.
     """
     store = get_notifications_config(app).store
     subject = recipient if isinstance(recipient, str) else recipient.subject
@@ -92,13 +110,35 @@ async def notify(
     from greentechhub_fastapi.settings import SETTINGS_STATE_KEY
 
     settings_config = getattr(app.state, SETTINGS_STATE_KEY, None)
+    channels: frozenset[str] = frozenset({"in_app"})
     if settings_config is not None:
         channels = await channels_for(settings_config.settings, _Subject(subject), category)
-        if "in_app" not in channels:
-            return None
     notification = from_toast(subject, payload, category=category)
+    if "email" in channels and getattr(app.state, EMAIL_STATE_KEY, None) is not None:
+        await _email_notification(app, recipient, notification)
+    if "in_app" not in channels:
+        return None
     await store.add(notification)
     return notification
+
+
+async def _email_notification(app: Any, recipient: Identity | str,
+                              notification: Notification) -> None:
+    address = await recipient_address(app, recipient)
+    if address is None:
+        logger.warning("no email address for %s; notification %s not emailed",
+                       notification.recipient, notification.id)
+        return
+    message = notification.message
+    subject = notification.title or (message if len(message) <= 80 else message[:79] + "…")
+    text = message
+    if notification.action_label and notification.action_url:
+        text += f"\n\n{notification.action_label}: {absolute_url(app, notification.action_url)}"
+    try:
+        await send_email(app, new_email(address, subject, text))
+    except (EmailDeliveryError, EmailNotConfiguredError, ValueError) as exc:
+        logger.warning("notification %s not emailed to %s: %s",
+                       notification.id, notification.recipient, exc)
 
 
 def notifications_nav_item(

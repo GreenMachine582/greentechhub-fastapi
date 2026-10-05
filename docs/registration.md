@@ -311,7 +311,12 @@ await notify(app, user, toast("Sync finished", kind="success"), category="sync")
 - **Delivery preferences:** register core's `notification_preferences({"sync": "Sync results"})` settings through
   `register_settings` and each person picks, per category, in the app, by email, both or off, on the settings page.
   `notify` stores nothing and returns `None` when their choice leaves out the app. A category without a preference
-  always goes to the app. The email channel isn't sent yet; that comes with the email adapter.
+  always goes to the app.
+- **By email:** when someone's choice includes email and [`register_email`](#email) ran, `notify` emails them too: to
+  their `Identity.email`, else `register_email`'s `address_for(subject)`. The subject is the title, else the message;
+  the text is the message plus the action link, made absolute with `base_url`. A failed or unconfigured send, or no
+  address, is logged as a warning and never raised, so a mail problem can't break the in-app notice or the caller.
+  `notify` returns the stored notification, or `None` when it wasn't stored (email only, or off).
 - Read notifications pile up: call `store.prune(before)` now and then (e.g. from a scheduled job). Unread ones are
   never pruned.
 
@@ -333,5 +338,33 @@ redirected there (303) instead; anything else is ignored, so it's never an open 
 `unread_only`, `page_url` and `mark_all_url`. Each notification is a dict of its fields (`id`, `message`, `kind`,
 `title`, `icon`, `action_label`, `action_url`, `category`, `created_at`, `read_at`) plus `read`, `read_url` and
 `toast` (its `toast()` detail). The badge gets `count` and should render nothing for 0.
+
+## Email
+
+`register_email(app, settings, sender=..., address_for=None, base_url=None)` puts a greentechhub-core `EmailSender`
+on the app, for `send_email()` and the email channel of [notifications](#notifications). The usual sender is core's
+`SettingsEmailSender`, which reads the mail server from core's `smtp_settings` on every send. An admin sets it up in
+Settings › App, and the password is a write-only, encrypted secret setting, so it never goes in the environment:
+
+```python
+from greentechhub_core.email import SettingsEmailSender, smtp_settings
+from greentechhub_core.settings.crypto import settings_cipher
+from greentechhub_fastapi import register_email, register_settings
+
+registry = SettingsRegistry([*USER_PREFERENCES, *smtp_settings(edit_permission="settings.manage")])
+service = register_settings(app, settings, registry=registry, store=store, views=SettingsViews(templates=templates),
+                            manage_permission="settings.manage", cipher=settings_cipher(settings))
+register_email(app, settings, sender=SettingsEmailSender(service), base_url="https://pyfinbot.example")
+```
+
+- `InMemoryEmailSender()` keeps an `outbox` instead of sending, for development and tests.
+- `address_for(subject)` is an async lookup for someone's address when there's only a subject, or an `Identity`
+  without an email, e.g. from your users table or the profile's email. `recipient_address(app, recipient)`
+  (`greentechhub_fastapi.email`) gives the answer: the `Identity.email`, else `address_for`, else `None`.
+- `base_url` makes relative links in emails absolute (`absolute_url(app, "/stocks")`).
+- `send_email(app, message)` sends a core `EmailMessage` (`new_email(to, subject, text, html=None)`), for your own
+  routes and jobs. `get_email_sender` is the same sender as a `Depends()`. Errors propagate: core's
+  `EmailDeliveryError` and `EmailNotConfiguredError` are `ApplicationError`s, so the exception handlers answer 502
+  and 503.
 
 See [docs/auth.md](auth.md), [docs/health.md](health.md), and [docs/modules.md](modules.md) for what each `register_*` call actually wires up.
