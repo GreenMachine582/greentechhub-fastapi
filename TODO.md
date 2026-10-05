@@ -17,14 +17,15 @@ consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.
   rest of login hardening, throttling and one generic error, is done)
 
 ### Notifications & email (M2)
-- [ ] Email delivery adapter (SMTP first), used by the views below and by `notify` for the "email" channel of
-  the delivery preferences (people can choose it, but nothing is sent yet)
+- [ ] Email delivery adapter — `register_email` over core's `greentechhub_core.email` (v0.11: a
+  `SettingsEmailSender` reading `smtp_settings`, keyed by `settings_cipher`), used by the views below and by
+  `notify` for the "email" channel of the delivery preferences (people can choose it, but nothing is sent yet)
 - [ ] Password reset — forgot-password and reset-by-token views on core's single-use tokens
 - [ ] Email verification — optional; gates login until the address is confirmed
 
 ### Data & forms
-- [ ] Query-builder validation — check greentechhub-ui's `gth_query_builder` JSON (via `parse_filter_json`) against
-  allow-listed fields and operators per field type, like `TableState`'s `filter_params`
+- [ ] Query-builder validation — run greentechhub-ui's `gth_query_builder` JSON (via `parse_filter_json`) through
+  core's `validate_filters` (v0.11) against a page's `FilterField`s, like `TableState`'s `filter_params`
 
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
