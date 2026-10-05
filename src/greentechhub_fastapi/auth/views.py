@@ -51,9 +51,10 @@ from greentechhub_core.identity import DevelopmentIdentityProvider, Identity
 from greentechhub_core.security import LoginThrottle, account_key, client_key
 
 from greentechhub_fastapi.auth.cookies import clear_session_cookie, create_session_cookie
+from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
 
 
-class LoginViews(ABC):
+class LoginViews(CsrfProtected, ABC):
     """Subclass and implement `authenticate()`, then mount `.router()`.
 
     Ships GET/POST /login and POST /logout. Not prefixed — mount at whatever
@@ -156,17 +157,22 @@ class LoginViews(ABC):
         # whose package __init__ imports this module.
         from greentechhub_fastapi.settings import self_signup_open
 
-        context = {"login_url": self.login_url, **extra}
+        context = {"login_url": self.login_url, **self._csrf_context(request), **extra}
         if self.register_url and await self_signup_open(request):
             context["register_url"] = self.register_url
         if self.forgot_password_url:
             context["forgot_password_url"] = self.forgot_password_url
         return context
 
-    async def _login_form(self, request: Request):
-        return self._templates.TemplateResponse(
-            request, self.login_template, await self._context(request)
+    async def _render(self, request: Request, status_code: int = 200, headers=None, **extra):
+        response = self._templates.TemplateResponse(
+            request, self.login_template, await self._context(request, **extra),
+            status_code=status_code, headers=headers,
         )
+        return self._with_csrf_cookie(request, response)
+
+    async def _login_form(self, request: Request):
+        return await self._render(request)
 
     def _throttle_keys(self, request: Request, user_id: str) -> list[str]:
         keys = [account_key(user_id)]
@@ -181,17 +187,18 @@ class LoginViews(ABC):
             f"Too many failed sign-ins. Try again in {minutes} "
             f"minute{'' if minutes == 1 else 's'}."
         )
-        return self._templates.TemplateResponse(
-            request,
-            self.login_template,
-            await self._context(request, error=error, user_id=user_id),
-            status_code=429,
-            headers={"Retry-After": str(seconds)},
-        )
+        return await self._render(request, 429, {"Retry-After": str(seconds)},
+                                  error=error, user_id=user_id)
 
     async def _login_submit(
-        self, request: Request, user_id: str = Form(...), password: str = Form(...)
+        self,
+        request: Request,
+        user_id: str = Form(...),
+        password: str = Form(...),
+        csrf_token: str = Form(""),
     ):
+        if self._csrf_refused(request, csrf_token):
+            return await self._render(request, 403, error=CSRF_REFUSED, user_id=user_id)
         throttle = self._throttle
         keys = self._throttle_keys(request, user_id) if throttle else []
         if throttle:
@@ -205,14 +212,8 @@ class LoginViews(ABC):
                 status = await throttle.record_failure(*keys)
                 if not status.allowed and status.retry_after is not None:
                     return await self._locked_out(request, user_id, status.retry_after)
-            return self._templates.TemplateResponse(
-                request,
-                self.login_template,
-                await self._context(
-                    request, error="Incorrect user ID or password", user_id=user_id
-                ),
-                status_code=401,
-            )
+            return await self._render(request, 401, error="Incorrect user ID or password",
+                                      user_id=user_id)
 
         # Imported here: greentechhub_fastapi.settings imports auth.dependency,
         # whose package __init__ imports this module.
@@ -223,12 +224,7 @@ class LoginViews(ABC):
             await throttle.record_success(account_key(user_id))
         if (refusal := await self.refuse_sign_in(identity)) is not None:
             extra = {"verify_resend_url": self.verify_resend_url} if self.verify_resend_url else {}
-            return self._templates.TemplateResponse(
-                request,
-                self.login_template,
-                await self._context(request, error=refusal, user_id=user_id, **extra),
-                status_code=403,
-            )
+            return await self._render(request, 403, error=refusal, user_id=user_id, **extra)
         token = self._identity_provider.issue(identity)
         url = await landing_url(request, identity, fallback=self.redirect_url)
         response = RedirectResponse(url=url, status_code=303)

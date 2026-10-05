@@ -11,11 +11,6 @@
 Cross-repo order (with greentechhub-core and greentechhub-ui): Accounts (M1) → Notifications & email (M2) →
 consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.0.
 
-### Accounts (M1)
-- [ ] CSRF tokens on the auth forms — opt-in on `LoginViews`/`RegisterViews`, passing `csrf_token` to the template
-  and checking it on POST; needs greentechhub-ui's sign-in and sign-up pages to render the hidden field first (the
-  rest of login hardening, throttling and one generic error, is done)
-
 ### Notifications & email (M2)
 - [ ] `RegisterViews`: an optional email field, emailing `EmailVerificationViews.send_link` after `create_user`
   (and not signing in until it's confirmed, when the service gates sign-in)

@@ -28,12 +28,13 @@ from greentechhub_core.email import (
 )
 from greentechhub_core.security import LoginThrottle, OneTimeTokens, account_key, client_key
 
+from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
 from greentechhub_fastapi.email import absolute_url, send_email
 
 logger = logging.getLogger(__name__)
 
 
-class EmailVerificationViews(ABC):
+class EmailVerificationViews(CsrfProtected, ABC):
     """Subclass and implement `mark_verified()` and `find_unverified()`, then
     mount `.router()`; call `send_link()` wherever an address is set. Needs
     register_email (with `base_url`, so the link is absolute).
@@ -144,15 +145,22 @@ class EmailVerificationViews(ABC):
     # send it again
 
     def _resend(self, request: Request, status_code: int = 200, headers=None, **extra):
-        context = {"resend_url": self.resend_url, "login_url": self.login_url, **extra}
-        return self._templates.TemplateResponse(request, self.resend_template, context,
-                                                status_code=status_code, headers=headers)
+        context = {"resend_url": self.resend_url, "login_url": self.login_url,
+                   **self._csrf_context(request), **extra}
+        response = self._templates.TemplateResponse(request, self.resend_template, context,
+                                                    status_code=status_code, headers=headers)
+        return self._with_csrf_cookie(request, response)
 
     async def _resend_form(self, request: Request):
         return self._resend(request)
 
-    async def _resend_submit(self, request: Request, identifier: str = Form("")):
+    async def _resend_submit(
+        self, request: Request, identifier: str = Form(""), csrf_token: str = Form("")
+    ):
         identifier = identifier.strip()
+        if self._csrf_refused(request, csrf_token):
+            return self._resend(request, 403, errors={"identifier": [CSRF_REFUSED]},
+                                identifier=identifier)
         if not identifier:
             return self._resend(request, 422,
                                 errors={"identifier": ["Enter your user ID or email."]})

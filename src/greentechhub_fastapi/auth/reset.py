@@ -27,12 +27,13 @@ from greentechhub_core.email import (
 )
 from greentechhub_core.security import LoginThrottle, OneTimeTokens, account_key, client_key
 
+from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
 from greentechhub_fastapi.email import absolute_url, send_email
 
 logger = logging.getLogger(__name__)
 
 
-class PasswordResetViews(ABC):
+class PasswordResetViews(CsrfProtected, ABC):
     """Subclass and implement `find_account()` and `set_password()`, then
     mount `.router()`. Needs register_email (with `base_url`, so the
     emailed link is absolute) for the email to go out.
@@ -124,15 +125,22 @@ class PasswordResetViews(ABC):
     # forgot password
 
     def _forgot(self, request: Request, status_code: int = 200, headers=None, **extra):
-        context = {"forgot_url": self.forgot_url, "login_url": self.login_url, **extra}
-        return self._templates.TemplateResponse(request, self.forgot_template, context,
-                                                status_code=status_code, headers=headers)
+        context = {"forgot_url": self.forgot_url, "login_url": self.login_url,
+                   **self._csrf_context(request), **extra}
+        response = self._templates.TemplateResponse(request, self.forgot_template, context,
+                                                    status_code=status_code, headers=headers)
+        return self._with_csrf_cookie(request, response)
 
     async def _forgot_form(self, request: Request):
         return self._forgot(request)
 
-    async def _forgot_submit(self, request: Request, identifier: str = Form("")):
+    async def _forgot_submit(
+        self, request: Request, identifier: str = Form(""), csrf_token: str = Form("")
+    ):
         identifier = identifier.strip()
+        if self._csrf_refused(request, csrf_token):
+            return self._forgot(request, 403, errors={"identifier": [CSRF_REFUSED]},
+                                identifier=identifier)
         if not identifier:
             return self._forgot(request, 422,
                                 errors={"identifier": ["Enter your user ID or email."]})
@@ -167,9 +175,11 @@ class PasswordResetViews(ABC):
 
     def _reset(self, request: Request, token: str, status_code: int = 200, **extra):
         context = {"action": f"{self.reset_url}/{token}", "login_url": self.login_url,
-                   "min_password_length": self.min_password_length, **extra}
-        return self._templates.TemplateResponse(request, self.reset_template, context,
-                                                status_code=status_code)
+                   "min_password_length": self.min_password_length,
+                   **self._csrf_context(request), **extra}
+        response = self._templates.TemplateResponse(request, self.reset_template, context,
+                                                    status_code=status_code)
+        return self._with_csrf_cookie(request, response)
 
     def _invalid(self, request: Request, token: str):
         return self._reset(request, token, 400, invalid=True, forgot_url=self.forgot_url)
@@ -185,7 +195,10 @@ class PasswordResetViews(ABC):
         token: str,
         password: str = Form(""),
         password_confirm: str = Form(""),
+        csrf_token: str = Form(""),
     ):
+        if self._csrf_refused(request, csrf_token):
+            return self._reset(request, token, 403, errors={"__all__": [CSRF_REFUSED]})
         errors: dict[str, list[str]] = {}
         if len(password) < self.min_password_length:
             errors["password"] = [f"Use at least {self.min_password_length} characters."]
