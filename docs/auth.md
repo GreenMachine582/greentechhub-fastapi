@@ -146,6 +146,27 @@ app.include_router(MyRegisterViews(templates=..., identity_provider=...).router(
   feature flag. While closed, both routes answer 404. `settings.self_signup_open(request)` gives the same answer for
   your own routes.
 
+**Asking for an email.** Set `ask_email = True` and the sign-up form also takes an email address, required unless
+`require_email = False`, and checked for shape. The template gets `ask_email` (and the `email` back after a refusal),
+and `create_user` is called with an `email` keyword (the address, or `None` when optional and left empty). Add
+one when you turn this on. Pass `verification=` (your `EmailVerificationViews`, below) and the new
+user is emailed a link to confirm the address; a mail problem is logged, not shown, since the account already
+exists and the resend form can send it again:
+
+```python
+class MyRegisterViews(RegisterViews):
+    ask_email = True
+    sign_in_before_verified = False      # hold the sign-in back until they confirm
+
+    async def create_user(self, user_id: str, password: str, email: str | None = None) -> Identity: ...
+
+register = MyRegisterViews(templates=templates, identity_provider=provider, verification=verification)
+```
+
+With `sign_in_before_verified = False` the new user isn't signed in. The page instead gets `verify_sent`, `email`
+and `verify_resend_url`, to say "check your email". Pair it with `LoginViews.refuse_sign_in` (below), so a sign-in
+before confirming is turned away. The default (`True`) signs them in straight away and only sends the link.
+
 **Password reset: `PasswordResetViews`** (`greentechhub_fastapi.auth.PasswordResetViews`) emails a single-use link
 (greentechhub-core's `OneTimeTokens`) and lets the person choose a new password. Finding the account and storing the
 password are left to fill in:
@@ -239,6 +260,30 @@ class MyLoginViews(LoginViews):
         user = await load_user(identity.subject)
         return None if user.email_verified else "Confirm your email address first."
 ```
+
+**CSRF (opt-in).** Set `csrf = True` on any of `LoginViews`, `RegisterViews`, `PasswordResetViews` and
+`EmailVerificationViews` to check a CSRF token on their forms' POSTs:
+
+```python
+class MyLoginViews(LoginViews):
+    csrf = True
+```
+
+- It's a double-submit cookie, which fits the stateless sessions. A form's page sets a random token as the `gth_csrf`
+  cookie (httponly, secure, samesite=lax, like the session cookie) and passes the same token to the template as
+  `csrf_token`. The POST must send it back as the `csrf_token` field. A page on another site can't read the cookie,
+  so it can't forge the field. The token is reused across pages, so the back button and a second tab keep working.
+- greentechhub-ui v0.15+ renders the field on every auth page (`gth_csrf_field`). A template of your own adds
+  `<input type="hidden" name="csrf_token" value="{{ csrf_token }}">` inside the form.
+- The check runs first, before the throttle, `authenticate` or anything else. A missing or wrong token re-renders
+  the page with status 403 and "Your session expired. Please try again." (`error` on the sign-in page; `errors`
+  under `__all__`, or under `identifier` on the forgot and resend forms), with a fresh token, and nothing else
+  happens: no sign-in, no user created, no email sent, no reset link used up.
+- Not covered: `POST /logout` (signing someone out is low-risk, and the navbar's logout form has no token), the
+  emailed links (plain GETs), and your own htmx forms, which can send a token in `hx-headers` and check it
+  themselves.
+- Over plain HTTP the secure cookie isn't sent back, so every checked POST is refused. Leave `csrf` off for
+  local HTTP testing, as the session cookie already needs HTTPS.
 
 ## Requiring a login on page routes
 

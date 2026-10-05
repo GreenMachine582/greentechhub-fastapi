@@ -64,6 +64,15 @@ async def recipient_address(app: Any, recipient: Identity | str) -> str | None:
     return await address_for(subject) or None
 
 
+def email_looks_valid(address: str) -> bool:
+    """Whether `address` looks like an email address: one @ with text on both
+    sides and no spaces. A form check, not a delivery guarantee."""
+    local, at, domain = address.partition("@")
+    return bool(local and at and domain) and "@" not in domain and not any(
+        c.isspace() for c in address
+    )
+
+
 def absolute_url(app: Any, url: str) -> str:
     """`url` made absolute with register_email's `base_url`, for a link in an
     email; returned as given without a base_url or when already absolute."""
