@@ -13,7 +13,6 @@ mail problem there is logged rather than shown, as with password reset.
 """
 
 import logging
-import math
 from abc import ABC, abstractmethod
 from datetime import timedelta
 from typing import Any
@@ -26,9 +25,15 @@ from greentechhub_core.email import (
     EmailNotConfiguredError,
     new_email,
 )
-from greentechhub_core.security import LoginThrottle, OneTimeTokens, account_key, client_key
+from greentechhub_core.security import (
+    LoginThrottle,
+    OneTimeTokens,
+    lockout_message,
+    throttle_keys,
+)
 
 from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
+from greentechhub_fastapi.auth.throttle import client_address
 from greentechhub_fastapi.email import absolute_url, send_email
 
 logger = logging.getLogger(__name__)
@@ -117,7 +122,7 @@ class EmailVerificationViews(CsrfProtected, ABC):
 
     def client_address(self, request: Request) -> str | None:
         """The address the throttle counts a client by, as LoginViews'."""
-        return request.client.host if request.client else None
+        return client_address(request)
 
     def router(self) -> APIRouter:
         router = APIRouter()
@@ -165,18 +170,14 @@ class EmailVerificationViews(CsrfProtected, ABC):
             return self._resend(request, 422,
                                 errors={"identifier": ["Enter your user ID or email."]})
         if self._throttle is not None:
-            keys = [account_key(identifier)]
-            if address := self.client_address(request):
-                keys.append(client_key(address))
+            keys = throttle_keys(identifier, self.client_address(request))
             status = await self._throttle.check(*keys)
             if status.allowed:
                 await self._throttle.record_failure(*keys)
             elif status.retry_after is not None:
-                seconds = max(1, math.ceil(status.retry_after.total_seconds()))
-                minutes = math.ceil(seconds / 60)
-                error = (f"Too many requests. Try again in {minutes} "
-                         f"minute{'' if minutes == 1 else 's'}.")
-                return self._resend(request, 429, {"Retry-After": str(seconds)},
+                error = lockout_message("requests", status.retry_after)
+                headers = {"Retry-After": str(status.retry_after_seconds)}
+                return self._resend(request, 429, headers,
                                     errors={"identifier": [error]}, identifier=identifier)
         account = await self.find_unverified(identifier)
         if account is not None:

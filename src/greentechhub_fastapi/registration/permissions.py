@@ -32,6 +32,7 @@ from greentechhub_fastapi.permissions import (
     RESOLVER_STATE_KEY,
     ROLES_STATE_KEY,
 )
+from greentechhub_fastapi.registration._settings import setting_value
 
 
 def _role_names(value: Any) -> list[str]:
@@ -43,7 +44,7 @@ def _role_names(value: Any) -> list[str]:
 def read_role_map(settings: Any, name: str) -> dict[str, list[str]]:
     """Read ROLE_GROUPS/ROLE_BOOTSTRAP-style `name` from `settings` as
     key → role names. Raises ValueError on a malformed value."""
-    value = getattr(settings, name, None)
+    value = setting_value(settings, name)
     if not value:
         return {}
     if isinstance(value, str):

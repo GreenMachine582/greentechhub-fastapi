@@ -40,18 +40,17 @@ has no equivalent, since Authentik issues its own session externally and
 there's no form to submit), but the caller decides that, not this class.
 """
 
-import math
 from abc import ABC, abstractmethod
-from datetime import timedelta
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from greentechhub_core.identity import DevelopmentIdentityProvider, Identity
-from greentechhub_core.security import LoginThrottle, account_key, client_key
+from greentechhub_core.security import LoginThrottle
 
 from greentechhub_fastapi.auth.cookies import clear_session_cookie, create_session_cookie
 from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
+from greentechhub_fastapi.auth.throttle import LoginLockedOut, client_address, throttled_login
 
 
 class LoginViews(CsrfProtected, ABC):
@@ -131,7 +130,7 @@ class LoginViews(CsrfProtected, ABC):
         host, which register_core's ProxyHeadersMiddleware has already
         corrected when the service sits behind a trusted proxy. Override for
         another source; None counts by account only."""
-        return request.client.host if request.client else None
+        return client_address(request)
 
     @abstractmethod
     async def authenticate(self, user_id: str, password: str) -> Identity | None:
@@ -174,22 +173,6 @@ class LoginViews(CsrfProtected, ABC):
     async def _login_form(self, request: Request):
         return await self._render(request)
 
-    def _throttle_keys(self, request: Request, user_id: str) -> list[str]:
-        keys = [account_key(user_id)]
-        if address := self.client_address(request):
-            keys.append(client_key(address))
-        return keys
-
-    async def _locked_out(self, request: Request, user_id: str, retry_after: timedelta):
-        seconds = max(1, math.ceil(retry_after.total_seconds()))
-        minutes = math.ceil(seconds / 60)
-        error = (
-            f"Too many failed sign-ins. Try again in {minutes} "
-            f"minute{'' if minutes == 1 else 's'}."
-        )
-        return await self._render(request, 429, {"Retry-After": str(seconds)},
-                                  error=error, user_id=user_id)
-
     async def _login_submit(
         self,
         request: Request,
@@ -199,19 +182,15 @@ class LoginViews(CsrfProtected, ABC):
     ):
         if self._csrf_refused(request, csrf_token):
             return await self._render(request, 403, error=CSRF_REFUSED, user_id=user_id)
-        throttle = self._throttle
-        keys = self._throttle_keys(request, user_id) if throttle else []
-        if throttle:
-            status = await throttle.check(*keys)
-            if not status.allowed and status.retry_after is not None:
-                return await self._locked_out(request, user_id, status.retry_after)
-
-        identity = await self.authenticate(user_id, password)
+        try:
+            identity = await throttled_login(
+                self._throttle, user_id, lambda: self.authenticate(user_id, password),
+                address=self.client_address(request),
+            )
+        except LoginLockedOut as locked:
+            return await self._render(request, 429, locked.headers, error=locked.detail,
+                                      user_id=user_id)
         if identity is None:
-            if throttle:
-                status = await throttle.record_failure(*keys)
-                if not status.allowed and status.retry_after is not None:
-                    return await self._locked_out(request, user_id, status.retry_after)
             return await self._render(request, 401, error="Incorrect user ID or password",
                                       user_id=user_id)
 
@@ -219,9 +198,6 @@ class LoginViews(CsrfProtected, ABC):
         # whose package __init__ imports this module.
         from greentechhub_fastapi.settings import landing_url
 
-        if throttle:
-            # The account only: one good login mustn't wipe a client's count.
-            await throttle.record_success(account_key(user_id))
         if (refusal := await self.refuse_sign_in(identity)) is not None:
             extra = {"verify_resend_url": self.verify_resend_url} if self.verify_resend_url else {}
             return await self._render(request, 403, error=refusal, user_id=user_id, **extra)
