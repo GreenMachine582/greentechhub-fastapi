@@ -39,6 +39,13 @@ docs/z ─┘                                                                   
 Never bump versions or edit released `CHANGELOG.md` sections by hand, and never move a `v*` tag (the tag ruleset
 blocks it).
 
+## Developing against local GTH repos
+
+With greentechhub-core checked out next to this repo, `./scripts/use-local-gth.sh` runs this venv against that
+checkout instead of the pinned release. `--status` shows which one is in use, and `--undo` goes back to the pin.
+It changes only the venv, never `pyproject.toml`, so CI keeps testing the pin. Details, invariants and the release
+order: [greentechhub-core's CONTRIBUTING.md](https://github.com/GreenMachine582/greentechhub-core/blob/dev/CONTRIBUTING.md#developing-against-local-gth-repos).
+
 ## Rules
 
 Repository rulesets (source of truth: [`.github/rulesets/`](.github/rulesets/), applied with
