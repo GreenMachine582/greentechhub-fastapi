@@ -6,26 +6,87 @@
 
 > Shipped work is recorded in [CHANGELOG.md](CHANGELOG.md) and on the [Releases page](https://github.com/GreenMachine582/greentechhub-fastapi/releases) — this file only tracks what's still open.
 
+How work lands: a gap a service hits is fixed in core first when it's framework-free, then here, then in
+greentechhub-ui. Releases go in that order and the services bump their pins last. Develop across the repos with
+local GTH mode (`scripts/use-local-gth.sh`, see [CONTRIBUTING.md](CONTRIBUTING.md)).
+
 ## 🗺️ Milestones
 
 Cross-repo order (with greentechhub-core and greentechhub-ui): Accounts (M1) → Notifications & email (M2) →
 consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.0.
 
+### M1 Accounts — done
+Sign-in pages (`LoginViews`, v0.6/v0.11), sign-up (`RegisterViews`, v0.12), password reset and email verification
+(v0.12), profile and change password in Settings (v0.12–v0.13), login throttling (v0.12) and throttled API logins
+(`throttled_login`, v0.14), opt-in CSRF on the auth forms (v0.13).
+
+### M2 Notifications & email — done
+`register_notifications` and `notify` (v0.12), `register_email` and notify-by-email (v0.12), the navbar bell pointed
+at the notification centre with no service code (v0.14).
+
+### M3 Consumers live — in progress
+- PyFinBot runs on this package throughout. Left on its side: the `forward_auth` switch once Authentik is live. This
+  package is ready for it (`register_core` + `TRUSTED_PROXIES`); validating Authentik's JWT is core's TODO.
+- BottleBot (lowest priority; it has no login yet):
+  - [ ] Adopt `register_auth`, if/when BottleBot grows a login
+  - [ ] Adopt `register_permissions`/`register_settings` alongside `register_auth` (same trigger)
+  - [ ] Replace watchlist's `_watchlist_page_params`/`_next_url` with `query.page_params`/`query.next_page_url`
+    (v0.7)
+
+### M4 ui breaking release — owned by greentechhub-ui
+ui drops its CDN-URL defaults, so services must mount `greentechhub_ui.static_dirs()`. This package's share:
+- [ ] When it lands, check `mount_static_dirs` in docs/registration.md and the README example still match what ui
+  requires, and that the playground mounts them.
+
+### M5 Display & data — next
+Shipped ahead of it: core-validated JSON filters (`validated_filter_json`, v0.12) for ui's planned query builder.
+
+- [ ] 1. `feat(auth): CSRF for htmx forms`
+  - **Why:** the auth forms are covered (v0.13), but docs/auth.md lists what isn't: `POST /logout`,
+    `SettingsViews`, `RoleAdminViews` and a service's own htmx forms. These are the state-changing requests a
+    signed-in user makes all day.
+  - **Scope:**
+    - one token per browser, reusing the `gth_csrf` double-submit cookie;
+    - a `csrf_header_context` the page context exposes, so greentechhub-ui's app shell can put it in `hx-headers`
+      (`X-CSRF-Token`) and a hidden field on its logout form;
+    - a `require_csrf` dependency for POST/PUT/PATCH/DELETE page routes, answering 403 like the auth forms;
+    - opt-in on `register_settings` / `RoleAdminViews` / the logout route.
+  - **Needs:** a greentechhub-ui change to the app shell, planned with it. core already has `generate_token` and
+    `constant_time_compare`.
+  - **Done when:** a signed-in page's htmx POST without the header is refused, with it succeeds, and logout works
+    from the navbar.
+- [ ] 2. `feat(audit): register_audit`
+  - **Why:** core ships an `AuditStore` (v0.10) with nothing writing to it. Services want "who signed in, who
+    changed a role, when did the last sync run", and ui plans a `gth_timeline` to show it.
+  - **Scope:**
+    - `register_audit(app, store)` puts the store on `app.state`;
+    - the views here record their own events: sign-in, failed sign-in, lockout, password change and reset, role
+      grant/revoke, settings changed;
+    - an `audit(request, action, ...)` helper for service events (e.g. PyFinBot's sync runs);
+    - an admin-only `AuditViews` page (filter by actor, action, date), permission-gated like `RoleAdminViews`.
+  - **Done when:** each auth view's event lands in the store with actor, action, target and time, and the page
+    lists them.
+
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
-one `register_*` call.
-- `register_admin(app)` — an "Admin" nav group collecting the admin views below, gated through nav permissions
+one `register_*` call. Who wants it is noted where known.
+- `register_admin(app)` — an "Admin" nav group collecting the admin views (roles, audit, users), gated through nav
+  permissions
 - Users admin — list, search, disable, force a password reset, assign roles inline (builds on `RoleAdminViews`
   and `RegisterViews`)
 - System status page — core health checks as a page (status, last checked, response time), admin-only with an
   optional public summary
 - Feature flags page — see and toggle flags per app, user or group (core's settings-backed provider)
 - API tokens — create, scope, see last use and revoke personal access tokens, for scripts, n8n and cron jobs
-- Sessions & devices — active sign-ins with browser, IP and last seen; "sign out everywhere"
-- Jobs & runs page — schedule, last status, duration, next run, "run now", raw output (core's scheduler)
+  (PyFinBot's API is used from scripts today with 24h JWTs)
+- Sessions & devices — active sign-ins with browser, IP and last seen; "sign out everywhere" (would also lift the
+  stateless-JWT "no force-logout" limit services note today)
+- Jobs & runs page — schedule, last status, duration, next run, "run now", raw output (core's scheduler);
+  PyFinBot's market, dividend and email syncs, BottleBot's scrapes
 - Event inspector — a dev/admin page tailing recent `EventBus` events with their payloads
 - About page — package and service versions and build info, links to changelogs
-- "View as" impersonation — the playground persona switcher as an audited admin feature with a banner
+- "View as" impersonation — the playground persona switcher as an audited admin feature with a banner (after
+  `register_audit`)
 - Settings import/export — a user's or the app's settings as JSON
 - `CrudViews(model, fields, permissions)` — list/detail/create/edit/delete pages from a SQLAlchemy model, on core's
   query helpers and greentechhub-ui's tables and forms
@@ -43,9 +104,7 @@ one `register_*` call.
 ## 🔄 Migration Tracking
 
 ### BottleBot
-- [ ] Adopt `register_auth`, if/when BottleBot grows a login (lowest priority)
-- [ ] Adopt `register_permissions`/`register_settings` alongside `register_auth` (same trigger, lowest priority)
-- [ ] Replace watchlist's `_watchlist_page_params`/`_next_url` with `query.page_params`/`query.next_page_url` (v0.7)
+Its open items are under M3 above.
 
 ### PyFinBot
 Nothing open: it runs on this package throughout (auth, settings, permissions, roles, logging, health, API error
