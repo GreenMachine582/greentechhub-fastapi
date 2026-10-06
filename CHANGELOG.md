@@ -5,6 +5,14 @@ version). From v0.8.0 on, entries are written by [release-please](https://github
 from conventional commits; the same notes are published as
 [GitHub Releases](https://github.com/GreenMachine582/greentechhub-fastapi/releases).
 
+## [0.14.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.13.0...v0.14.0) (2026-10-06)
+
+
+### Features
+
+* **auth:** throttled API logins ([#56](https://github.com/GreenMachine582/greentechhub-fastapi/issues/56)) ([ec55f24](https://github.com/GreenMachine582/greentechhub-fastapi/commit/ec55f24b210643709122ce738aaa13b8291d2193))
+* **settings:** the page context points the bell at the notification centre ([#55](https://github.com/GreenMachine582/greentechhub-fastapi/issues/55)) ([99c37a3](https://github.com/GreenMachine582/greentechhub-fastapi/commit/99c37a3a7add7768381b0067a8ff0c4cd0e8496e))
+
 ## [0.13.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.12.0...v0.13.0) (2026-10-05)
 
 
