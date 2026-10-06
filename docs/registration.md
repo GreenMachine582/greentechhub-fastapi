@@ -17,6 +17,15 @@ register_auth(app, settings)      # picks local vs. forward_auth from settings.a
 
 CORS is bundled into `register_core` rather than a separate call — it reads allowed origins from a `CORS_ALLOWED_ORIGINS`-style field on the service's `Settings`, defaulting to empty/restrictive so a service is safe out of the box and one env var away from configured.
 
+**Where the settings come from.**
+- `AUTH_ADAPTER`, `CORS_ALLOWED_ORIGINS`, `TRUSTED_PROXIES`, `ROLE_GROUPS` and `ROLE_BOOTSTRAP` are fields of
+  greentechhub-core's `GTHBaseSettings` (core v0.12+, lowercase: `auth_adapter`, …). A service's `Settings`
+  gets them just by extending it and setting the env vars.
+- A service's own SCREAMING_CASE attribute, declared or set at runtime, still takes precedence when it's
+  non-empty. Both read the same env var, so they only differ after a runtime change.
+- Behind a reverse proxy, set `TRUSTED_PROXIES`. Without it every request looks like it came from the proxy,
+  and per-client counts such as the login throttle's become one count for everybody.
+
 Each `register_*` function is small and composable — a service can skip ones it doesn't need (a pure internal API might skip `register_auth`) rather than getting an all-or-nothing bundle.
 
 A service's own `Settings` still extends `greentechhub-core`'s `GTHBaseSettings` directly:

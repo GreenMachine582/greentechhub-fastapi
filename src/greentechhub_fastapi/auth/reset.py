@@ -24,15 +24,16 @@ from greentechhub_core.email import (
     EmailNotConfiguredError,
     new_email,
 )
-from greentechhub_core.security import LoginThrottle, OneTimeTokens, account_key
-
-from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
-from greentechhub_fastapi.auth.throttle import (
-    client_address,
+from greentechhub_core.security import (
+    LoginThrottle,
+    OneTimeTokens,
+    account_key,
     lockout_message,
-    retry_after_seconds,
     throttle_keys,
 )
+
+from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
+from greentechhub_fastapi.auth.throttle import client_address
 from greentechhub_fastapi.email import absolute_url, send_email
 
 logger = logging.getLogger(__name__)
@@ -156,7 +157,7 @@ class PasswordResetViews(CsrfProtected, ABC):
                 await self._throttle.record_failure(*keys)
             elif status.retry_after is not None:
                 error = lockout_message("reset requests", status.retry_after)
-                headers = {"Retry-After": str(retry_after_seconds(status.retry_after))}
+                headers = {"Retry-After": str(status.retry_after_seconds)}
                 return self._forgot(request, 429, headers,
                                     errors={"identifier": [error]}, identifier=identifier)
         account = await self.find_account(identifier)

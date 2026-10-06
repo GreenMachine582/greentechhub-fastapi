@@ -1,7 +1,15 @@
-"""read_list_setting / read_str_setting — tolerant, private helpers for reading
-settings (CORS_ALLOWED_ORIGINS, TRUSTED_PROXIES, AUTH_ADAPTER) that live on a
-service's own Settings subclass, not on greentechhub_core.config.GTHBaseSettings
-itself (it only declares secret_key/log_level).
+"""setting_value / read_list_setting / read_str_setting — tolerant, private
+helpers for reading the adapter settings (AUTH_ADAPTER, CORS_ALLOWED_ORIGINS,
+TRUSTED_PROXIES, ROLE_GROUPS, ROLE_BOOTSTRAP).
+
+greentechhub_core's GTHBaseSettings declares them as lowercase fields
+(`trusted_proxies`, …) since core v0.12, so a service gets them just by
+extending it. A service's own SCREAMING_CASE attribute, declared or set at
+runtime (PyFinBot sets CORS_ALLOWED_ORIGINS="*" in development), comes
+first when it's non-empty; otherwise core's lowercase field. Both read the
+same env var, so they only differ when a service changed one at runtime,
+and core's non-empty defaults (auth_adapter="local") mustn't hide that. A
+plain object without GTHBaseSettings works too.
 
 Accepts either a comma-separated string (the natural shape for an env-var-backed
 field, e.g. CORS_ALLOWED_ORIGINS="https://a.example,https://b.example") or an
@@ -15,8 +23,18 @@ from collections.abc import Sequence
 from typing import Any
 
 
+def setting_value(settings: Any, name: str) -> Any:
+    """`name` (e.g. "TRUSTED_PROXIES") from `settings`: the service's own
+    SCREAMING_CASE attribute when it's non-empty, else the lowercase field
+    GTHBaseSettings declares; None if neither is set."""
+    for attribute in (name.upper(), name.lower()):
+        if value := getattr(settings, attribute, None):
+            return value
+    return None
+
+
 def read_list_setting(settings: Any, name: str) -> list[str]:
-    value = getattr(settings, name, "")
+    value = setting_value(settings, name)
     if not value:
         return []
     if isinstance(value, str):
@@ -28,7 +46,7 @@ def read_list_setting(settings: Any, name: str) -> list[str]:
 
 def read_str_setting(settings: Any, name: str, default: str) -> str:
     """Read a scalar string setting, falling back to `default` when unset/falsy."""
-    value = getattr(settings, name, "")
+    value = setting_value(settings, name)
     if not value:
         return default
     return str(value)

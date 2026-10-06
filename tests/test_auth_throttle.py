@@ -2,12 +2,18 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 import httpx
+import pytest
 from fastapi import FastAPI, Form, Request
-from greentechhub_core.security import InMemoryAttemptStore, LoginThrottle, account_key, client_key
+from greentechhub_core.security import (
+    InMemoryAttemptStore,
+    LoginThrottle,
+    ThrottleStatus,
+    account_key,
+    client_key,
+)
 from greentechhub_core.types import UnauthorizedError
 
 from greentechhub_fastapi.auth import LoginLockedOut, client_address, throttled_login
-from greentechhub_fastapi.auth.throttle import lockout_message, retry_after_seconds, throttle_keys
 from greentechhub_fastapi.exceptions import register_api_error_handlers, register_exception_handlers
 
 
@@ -19,33 +25,20 @@ class _Clock:
         return self.now
 
 
-# ── helpers ─────────────────────────────────────────────────────────────────
-
-
-def test_throttle_keys_count_the_account_and_a_known_client():
-    assert throttle_keys(" Alice", "203.0.113.7") == [account_key("alice"),
-                                                      client_key("203.0.113.7")]
-    assert throttle_keys("alice", None) == [account_key("alice")]
-
-
-def test_retry_after_is_whole_seconds_and_at_least_one():
-    assert retry_after_seconds(timedelta(seconds=89.2)) == 90
-    assert retry_after_seconds(timedelta(0)) == 1
-
-
-def test_lockout_message_rounds_up_to_minutes():
-    assert lockout_message("failed sign-ins", timedelta(minutes=15)) == (
-        "Too many failed sign-ins. Try again in 15 minutes.")
-    assert lockout_message("requests", timedelta(seconds=30)) == (
-        "Too many requests. Try again in 1 minute.")
+# ── LoginLockedOut ──────────────────────────────────────────────────────────
 
 
 def test_login_locked_out_is_a_429_with_retry_after():
-    locked = LoginLockedOut(timedelta(minutes=2))
+    locked = LoginLockedOut(ThrottleStatus(allowed=False, retry_after=timedelta(minutes=2)))
     assert locked.status_code == 429
     assert locked.headers == {"Retry-After": "120"}
     assert locked.detail == "Too many failed sign-ins. Try again in 2 minutes."
     assert locked.retry_after == timedelta(minutes=2)
+
+
+def test_login_locked_out_needs_a_locked_status():
+    with pytest.raises(ValueError):
+        LoginLockedOut(ThrottleStatus(allowed=True))
 
 
 # ── throttled_login on an API token route ───────────────────────────────────

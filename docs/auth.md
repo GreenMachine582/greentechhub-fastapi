@@ -123,6 +123,9 @@ async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
   account's count and is returned.
 - Under `register_api_error_handlers`' prefix the 429 comes back in the envelope, `code` `"too_many_requests"`.
 - `address=None` counts by account only. `throttle=None` just runs the callable.
+- The keys (`throttle_keys`), the Retry-After seconds (`ThrottleStatus.retry_after_seconds`) and the message
+  (`lockout_message`) are greentechhub-core's, the same ones `LoginViews`, `PasswordResetViews` and
+  `EmailVerificationViews` use.
 
 **Sign-up: `RegisterViews`** (`greentechhub_fastapi.auth.RegisterViews`) is the same idea for self-service sign-up:
 `GET`/`POST /register`, with only storing the new user left to fill in:
