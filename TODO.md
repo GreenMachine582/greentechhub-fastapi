@@ -48,10 +48,8 @@ one `register_*` call.
 - [ ] Replace watchlist's `_watchlist_page_params`/`_next_url` with `query.page_params`/`query.next_page_url` (v0.7)
 
 ### PyFinBot
-- [ ] Throttle `/api/auth/login` with `throttled_login`, sharing the sign-in form's `LoginThrottle`
-
-Otherwise it runs on this package throughout (auth, settings, permissions, roles, logging, health, API error
-handlers, query paging). Its own follow-ups are in PyFinBot's `todo.md`.
+Nothing open: it runs on this package throughout (auth, settings, permissions, roles, logging, health, API error
+handlers, query paging, login throttling). Its own follow-ups are in PyFinBot's `todo.md`.
 
 ### Market Watch (planned)
 - [ ] Not started — builds on this from day one, same as PyFinBot
