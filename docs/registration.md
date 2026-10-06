@@ -17,6 +17,15 @@ register_auth(app, settings)      # picks local vs. forward_auth from settings.a
 
 CORS is bundled into `register_core` rather than a separate call — it reads allowed origins from a `CORS_ALLOWED_ORIGINS`-style field on the service's `Settings`, defaulting to empty/restrictive so a service is safe out of the box and one env var away from configured.
 
+**Where the settings come from.**
+- `AUTH_ADAPTER`, `CORS_ALLOWED_ORIGINS`, `TRUSTED_PROXIES`, `ROLE_GROUPS` and `ROLE_BOOTSTRAP` are fields of
+  greentechhub-core's `GTHBaseSettings` (core v0.12+, lowercase: `auth_adapter`, …). A service's `Settings`
+  gets them just by extending it and setting the env vars.
+- A service's own SCREAMING_CASE attribute, declared or set at runtime, still takes precedence when it's
+  non-empty. Both read the same env var, so they only differ after a runtime change.
+- Behind a reverse proxy, set `TRUSTED_PROXIES`. Without it every request looks like it came from the proxy,
+  and per-client counts such as the login throttle's become one count for everybody.
+
 Each `register_*` function is small and composable — a service can skip ones it doesn't need (a pure internal API might skip `register_auth`) rather than getting an all-or-nothing bundle.
 
 A service's own `Settings` still extends `greentechhub-core`'s `GTHBaseSettings` directly:
@@ -206,6 +215,7 @@ processor, turns that into greentechhub-ui's optional template keys:
 | `theme_mode` | signed in, and `ui.theme` is registered |
 | `theme_save_url`, `user_menu_items` (Settings) | signed in, and `views` were mounted |
 | `logout_url` | signed in, and `logout_url` was given |
+| `notifications_url` | signed in, and `register_notifications` mounted `views`: greentechhub-ui v0.15+ shows the navbar bell |
 | `user_display_name` | signed in, `views` have the profile hooks, and the user has set a display name |
 | `site_banners` | core's `site_banner_settings()` is registered and the message isn't empty: any visitor, signed in or not |
 
@@ -316,7 +326,7 @@ from greentechhub_fastapi.notifications import NotificationViews, notifications_
 
 store = SQLAlchemyNotificationStore(notifications_table(metadata), async_session_factory=async_session)
 register_notifications(app, settings, store=store, views=NotificationViews(templates=templates))
-nav_items = [..., notifications_nav_item()]  # greentechhub-ui NavItem with a live unread badge
+nav_items = [..., notifications_nav_item()]  # optional: a nav link with the same live unread badge
 
 # anywhere with the app at hand: a route, a background job
 await notify(app, user, toast("Sync finished", kind="success"), category="sync")

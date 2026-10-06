@@ -102,6 +102,31 @@ router = MyLoginViews(templates=..., identity_provider=..., throttle=LoginThrott
 - `InMemoryAttemptStore` suits a single process only. Call `throttle.prune()` now and then (e.g. from a scheduled
   job) to delete expired records.
 
+**API logins.** A login route of the service's own, e.g. an OAuth2 token endpoint for its API, gets the same lockout
+from `throttled_login`. Pass it the same `LoginThrottle` as `LoginViews`, so a guesser locked out of one can't carry
+on at the other:
+
+```python
+from greentechhub_fastapi.auth import client_address, throttled_login
+
+@router.post("/auth/login")
+async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
+    user = await throttled_login(throttle, form.username, lambda: check_password(form),
+                                 address=client_address(request))
+    if user is None:
+        raise UnauthorizedError("Incorrect user ID or password")
+    return {"access_token": issue_token(user), "token_type": "bearer"}
+```
+
+- It checks the lock first and raises `LoginLockedOut` (429, `Retry-After`, the same "Too many failed sign-ins"
+  message) without calling the callable. A `None` result counts as a failure. Any other result clears the
+  account's count and is returned.
+- Under `register_api_error_handlers`' prefix the 429 comes back in the envelope, `code` `"too_many_requests"`.
+- `address=None` counts by account only. `throttle=None` just runs the callable.
+- The keys (`throttle_keys`), the Retry-After seconds (`ThrottleStatus.retry_after_seconds`) and the message
+  (`lockout_message`) are greentechhub-core's, the same ones `LoginViews`, `PasswordResetViews` and
+  `EmailVerificationViews` use.
+
 **Sign-up: `RegisterViews`** (`greentechhub_fastapi.auth.RegisterViews`) is the same idea for self-service sign-up:
 `GET`/`POST /register`, with only storing the new user left to fill in:
 

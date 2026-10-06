@@ -193,3 +193,47 @@ def test_the_nav_item_carries_the_live_badge():
         "label": "Notifications", "url": "/notifications", "icon": "bell",
         "badge_url": "/notifications/badge", "badge_event": NOTIFICATIONS_EVENT,
     }
+
+
+# ── the page context ───────────────────────────────────────────────────────
+
+
+def _context_app(role_settings, tmp_path, *, views=True, url=None):  # noqa: F811
+    from fastapi import Request
+    from greentechhub_core.settings import InMemorySettingsStore, SettingsRegistry
+
+    from greentechhub_fastapi.settings import settings_context
+
+    (tmp_path / "ctx.html").write_text("BELL={{ notifications_url|default('unset') }}",
+                                       encoding="utf-8")
+    page_templates = Jinja2Templates(directory=tmp_path, context_processors=[settings_context])
+    app = build_app(role_settings)
+    register_settings(app, role_settings, registry=SettingsRegistry([]),
+                      store=InMemorySettingsStore())
+    notification_views = None
+    if views:
+        notification_views = NotificationViews(templates=page_templates)
+        if url:
+            notification_views.url = url
+    register_notifications(app, role_settings, store=InMemoryNotificationStore(),
+                           views=notification_views)
+
+    @app.get("/page")
+    async def page(request: Request):
+        return page_templates.TemplateResponse(request, "ctx.html", {})
+
+    return app
+
+
+def test_signed_in_pages_point_the_bell_at_the_notification_centre(role_settings,  # noqa: F811
+                                                                    tmp_path):
+    app = _context_app(role_settings, tmp_path)
+    assert _run(app, _get("/page"), subject="alice").text == "BELL=/notifications"
+    assert _run(app, _get("/page")).text == "BELL=unset"  # anonymous
+
+
+def test_no_bell_without_the_views_and_a_custom_url_is_kept(role_settings, tmp_path):  # noqa: F811
+    bare = _context_app(role_settings, tmp_path, views=False)
+    assert _run(bare, _get("/page"), subject="alice").text == "BELL=unset"
+    custom = _context_app(role_settings, tmp_path, url="/inbox")
+    assert _run(custom, _get("/page"), subject="alice").text == "BELL=/inbox"

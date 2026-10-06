@@ -15,8 +15,8 @@ consumers live (M3) → ui breaking release (M4) → display & data (M5) → v1.
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
 one `register_*` call.
 - `register_admin(app)` — an "Admin" nav group collecting the admin views below, gated through nav permissions
-- Users admin — list, search, disable, force a password reset, assign roles inline (builds on `RoleAdminViews`;
-  needed once register lands)
+- Users admin — list, search, disable, force a password reset, assign roles inline (builds on `RoleAdminViews`
+  and `RegisterViews`)
 - System status page — core health checks as a page (status, last checked, response time), admin-only with an
   optional public summary
 - Feature flags page — see and toggle flags per app, user or group (core's settings-backed provider)
@@ -48,7 +48,9 @@ one `register_*` call.
 - [ ] Replace watchlist's `_watchlist_page_params`/`_next_url` with `query.page_params`/`query.next_page_url` (v0.7)
 
 ### PyFinBot
-Nothing open: it runs on this package throughout (auth, settings, permissions, roles, logging, health, API error
+- [ ] Throttle `/api/auth/login` with `throttled_login`, sharing the sign-in form's `LoginThrottle`
+
+Otherwise it runs on this package throughout (auth, settings, permissions, roles, logging, health, API error
 handlers, query paging). Its own follow-ups are in PyFinBot's `todo.md`.
 
 ### Market Watch (planned)

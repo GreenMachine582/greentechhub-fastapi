@@ -31,6 +31,7 @@ HTTP_STATUS_CODES: dict[int, str] = {
     405: "method_not_allowed",
     409: "conflict",
     422: "validation_error",
+    429: "too_many_requests",
 }
 
 
