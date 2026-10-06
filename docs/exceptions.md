@@ -48,7 +48,7 @@ register_api_error_handlers(app, prefix="/api")   # www_authenticate="Bearer" by
 
 | Under the prefix | Response |
 |---|---|
-| An unknown route, a wrong method, or any `HTTPException` (including `OAuth2PasswordBearer`'s 401) | the envelope at its status, keeping its headers; `code` is `bad_request` / `unauthorized` / `forbidden` / `not_found` / `method_not_allowed` / `conflict` / `validation_error`, else `http_<status>` |
+| An unknown route, a wrong method, or any `HTTPException` (including `OAuth2PasswordBearer`'s 401) | the envelope at its status, keeping its headers; `code` is `bad_request` / `unauthorized` / `forbidden` / `not_found` / `method_not_allowed` / `conflict` / `validation_error` / `too_many_requests`, else `http_<status>` |
 | A request validation error | 422 `validation_error`, "Invalid request", the error list as `details` |
 | core's `UnauthorizedError` | the 401 envelope plus `WWW-Authenticate: Bearer` (the OAuth2 bearer challenge); `www_authenticate=None` omits it, and off the prefix it never has it |
 
