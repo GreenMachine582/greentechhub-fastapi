@@ -85,4 +85,9 @@ async def sync(id: int):
 - `mount_static_dirs(app, {prefix: directory})` — one `StaticFiles` mount per entry, named after the prefix.
 - `hx_response(trigger, *, status_code=204, content="", headers=None)` — a response whose `HX-Trigger` is
   `trigger` (a string, e.g. `greentechhub_ui.toast(...)` / `greentechhub_ui.htmx.trigger(...)`, or a mapping,
-  JSON-encoded). Bodyless 204 by default; `status_code=200` + `content` to swap something in too.
+  JSON-encoded). Bodyless 204 by default; `status_code=200` + `content` to swap something in too. To trigger events
+  from a rendered template instead, pass the same value as its header:
+  `TemplateResponse(request, "_result.html", ctx, headers={"HX-Trigger": greentechhub_ui.toast(...)})`.
+- `forms.field_errors(validation_error)` turns a pydantic `ValidationError` into the errors-by-field dict ui's form
+  macros take (`errors.get("units")`). A nested error goes under its top-level field, and a model-level one under
+  `"__all__"`. Re-render the form with it and status 422.

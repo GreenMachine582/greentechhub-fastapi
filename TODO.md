@@ -77,12 +77,6 @@ deletes when it adopts each.
     `BadRequestError` (400) when `fields=` validation fails. PyFinBot re-implements it (`api/query.py`) to get 400
     everywhere.
   - **Scope:** raise `BadRequestError` (`invalid_sort` / `invalid_filters`) in both cases.
-- [ ] F5. `feat(htmx)`: triggers on template responses, and form errors
-  - **Why:** `hx_response` only builds bodyless/plain responses, so PyFinBot and BottleBot set `HX-Trigger` on a
-    `TemplateResponse` by hand (5 places in PyFinBot). PyFinBot also hand-maps pydantic errors to the field-errors
-    dict ui's forms take.
-  - **Scope:** `with_triggers(response, trigger)` (or `hx_response(..., response=)`) and
-    `field_errors(validation_error)`.
 - [ ] F6. `refactor(auth)`: shared pieces in the auth views (after core C1/C2)
   - **Why:** `PasswordResetViews` and `EmailVerificationViews` are near-identical (constructor, `client_address`,
     the forgot/resend flow, issue → link → send). The CSRF render step is repeated 5×. The email-error tuple is
