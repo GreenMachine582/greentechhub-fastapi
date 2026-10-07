@@ -5,6 +5,21 @@ version). From v0.8.0 on, entries are written by [release-please](https://github
 from conventional commits; the same notes are published as
 [GitHub Releases](https://github.com/GreenMachine582/greentechhub-fastapi/releases).
 
+## [0.15.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.14.0...v0.15.0) (2026-10-07)
+
+
+### Features
+
+* **auth:** bearer tokens for API routes ([#61](https://github.com/GreenMachine582/greentechhub-fastapi/issues/61)) ([9b2bcf2](https://github.com/GreenMachine582/greentechhub-fastapi/commit/9b2bcf2ff16d193e50e3519ef03d1e3a4bc82961))
+* **forms:** field errors from a ValidationError ([#65](https://github.com/GreenMachine582/greentechhub-fastapi/issues/65)) ([af467b9](https://github.com/GreenMachine582/greentechhub-fastapi/commit/af467b955e5f9890af1b342ab0d20e49e4cd499e))
+* **logging:** register_logging service, version and uvicorn ([#63](https://github.com/GreenMachine582/greentechhub-fastapi/issues/63)) ([bcea8e4](https://github.com/GreenMachine582/greentechhub-fastapi/commit/bcea8e4f2dfd9c9ed3ccef5b130d6cb3f69de695))
+* **query:** CSV downloads ([#64](https://github.com/GreenMachine582/greentechhub-fastapi/issues/64)) ([fd43bf1](https://github.com/GreenMachine582/greentechhub-fastapi/commit/fd43bf1f8ccdc6e72dea620544781e09662b260b))
+
+
+### Bug Fixes
+
+* **query:** bad sort or filter input is a 400 ([#62](https://github.com/GreenMachine582/greentechhub-fastapi/issues/62)) ([9ddd358](https://github.com/GreenMachine582/greentechhub-fastapi/commit/9ddd358e2913e4ae160b03d8d61c9f482e40f50e))
+
 ## [0.14.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.13.0...v0.14.0) (2026-10-06)
 
 
