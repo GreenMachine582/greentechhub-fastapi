@@ -20,51 +20,23 @@ groups are needed. RoleResolver fails fast on a map naming an unknown
 role, so a typo in either setting surfaces at startup.
 """
 
-import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from typing import Any
 
 from fastapi import FastAPI
-from greentechhub_core.permissions import GrantStore, PermissionResolver, Role, RoleResolver
+from greentechhub_core.permissions import (
+    GrantStore,
+    PermissionResolver,
+    Role,
+    RoleResolver,
+    read_role_map,
+)
 
 from greentechhub_fastapi.permissions import (
     GRANTS_STATE_KEY,
     RESOLVER_STATE_KEY,
     ROLES_STATE_KEY,
 )
-from greentechhub_fastapi.registration._settings import setting_value
-
-
-def _role_names(value: Any) -> list[str]:
-    if isinstance(value, str):
-        return [name.strip() for name in value.replace("|", ",").split(",") if name.strip()]
-    return [str(name) for name in value]
-
-
-def read_role_map(settings: Any, name: str) -> dict[str, list[str]]:
-    """Read ROLE_GROUPS/ROLE_BOOTSTRAP-style `name` from `settings` as
-    key → role names. Raises ValueError on a malformed value."""
-    value = setting_value(settings, name)
-    if not value:
-        return {}
-    if isinstance(value, str):
-        text = value.strip()
-        if text.startswith("{"):
-            try:
-                value = json.loads(text)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"{name}: not valid JSON: {exc}") from None
-        else:
-            pairs = {}
-            for entry in filter(None, (part.strip() for part in text.split(","))):
-                key, sep, roles = entry.partition("=")
-                if not sep or not key.strip():
-                    raise ValueError(f"{name}: expected 'key=role|role,...', got {entry!r}")
-                pairs[key.strip()] = roles.replace("|", ",")
-            value = pairs
-    if not isinstance(value, Mapping):
-        raise ValueError(f"{name}: expected a mapping of key → role names")
-    return {str(key): _role_names(roles) for key, roles in value.items()}
 
 
 def register_permissions(

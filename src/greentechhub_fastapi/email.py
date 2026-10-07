@@ -18,10 +18,22 @@ from typing import Any
 from urllib.parse import urljoin
 
 from fastapi import Request
-from greentechhub_core.email import EmailMessage, EmailSender
+from greentechhub_core.email import (
+    EmailDeliveryError,
+    EmailMessage,
+    EmailNotConfiguredError,
+    EmailSender,
+)
+from greentechhub_core.email import email_looks_valid as email_looks_valid  # re-export
 from greentechhub_core.identity import Identity
 
 EMAIL_STATE_KEY = "gth_email"
+
+#: What a best-effort email (a reset link, a confirmation, a notification)
+#: catches and logs instead of raising: the sender refusing or being
+#: unreachable, email not set up, register_email not called (RuntimeError),
+#: or an address the message refuses (ValueError).
+EMAIL_SEND_ERRORS = (EmailDeliveryError, EmailNotConfiguredError, RuntimeError, ValueError)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -62,15 +74,6 @@ async def recipient_address(app: Any, recipient: Identity | str) -> str | None:
         return None
     subject = recipient if isinstance(recipient, str) else recipient.subject
     return await address_for(subject) or None
-
-
-def email_looks_valid(address: str) -> bool:
-    """Whether `address` looks like an email address: one @ with text on both
-    sides and no spaces. A form check, not a delivery guarantee."""
-    local, at, domain = address.partition("@")
-    return bool(local and at and domain) and "@" not in domain and not any(
-        c.isspace() for c in address
-    )
 
 
 def absolute_url(app: Any, url: str) -> str:

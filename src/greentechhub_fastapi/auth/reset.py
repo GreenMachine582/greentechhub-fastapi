@@ -13,33 +13,20 @@ which accounts exist.
 """
 
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from datetime import timedelta
 
 from fastapi import APIRouter, Form, Request
-from fastapi.templating import Jinja2Templates
-from greentechhub_core.email import (
-    EmailDeliveryError,
-    EmailMessage,
-    EmailNotConfiguredError,
-    new_email,
-)
-from greentechhub_core.security import (
-    LoginThrottle,
-    OneTimeTokens,
-    account_key,
-    lockout_message,
-    throttle_keys,
-)
+from greentechhub_core.email import EmailMessage, new_email
+from greentechhub_core.security import account_key, password_problem
 
-from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
-from greentechhub_fastapi.auth.throttle import client_address
-from greentechhub_fastapi.email import absolute_url, send_email
+from greentechhub_fastapi.auth.csrf import CSRF_REFUSED
+from greentechhub_fastapi.auth.emailed_link import EmailedLinkViews
 
 logger = logging.getLogger(__name__)
 
 
-class PasswordResetViews(CsrfProtected, ABC):
+class PasswordResetViews(EmailedLinkViews):
     """Subclass and implement `find_account()` and `set_password()`, then
     mount `.router()`. Needs register_email (with `base_url`, so the
     emailed link is absolute) for the email to go out.
@@ -73,25 +60,11 @@ class PasswordResetViews(CsrfProtected, ABC):
     forgot_url: str = "/forgot-password"
     reset_url: str = "/reset-password"
 
-    #: The sign-in page, linked from both pages.
-    login_url: str = "/login"
-
     #: The shortest password accepted.
     min_password_length: int = 8
 
     #: How long an emailed link works.
     token_lifetime: timedelta = timedelta(hours=1)
-
-    def __init__(
-        self,
-        *,
-        templates: Jinja2Templates,
-        tokens: OneTimeTokens,
-        throttle: LoginThrottle | None = None,
-    ) -> None:
-        self._templates = templates
-        self._tokens = tokens
-        self._throttle = throttle
 
     @abstractmethod
     async def find_account(self, identifier: str) -> tuple[str, str] | None:
@@ -116,10 +89,6 @@ class PasswordResetViews(CsrfProtected, ABC):
         )
         return new_email(address, "Reset your password", text)
 
-    def client_address(self, request: Request) -> str | None:
-        """The address the throttle counts a client by, as LoginViews'."""
-        return client_address(request)
-
     def router(self) -> APIRouter:
         router = APIRouter()
         router.add_api_route(self.forgot_url, self._forgot_form, methods=["GET"])
@@ -131,11 +100,9 @@ class PasswordResetViews(CsrfProtected, ABC):
     # forgot password
 
     def _forgot(self, request: Request, status_code: int = 200, headers=None, **extra):
-        context = {"forgot_url": self.forgot_url, "login_url": self.login_url,
-                   **self._csrf_context(request), **extra}
-        response = self._templates.TemplateResponse(request, self.forgot_template, context,
-                                                    status_code=status_code, headers=headers)
-        return self._with_csrf_cookie(request, response)
+        context = {"forgot_url": self.forgot_url, "login_url": self.login_url, **extra}
+        return self._render_form(request, self.forgot_template, context,
+                                 status_code=status_code, headers=headers)
 
     async def _forgot_form(self, request: Request):
         return self._forgot(request)
@@ -143,45 +110,21 @@ class PasswordResetViews(CsrfProtected, ABC):
     async def _forgot_submit(
         self, request: Request, identifier: str = Form(""), csrf_token: str = Form("")
     ):
-        identifier = identifier.strip()
-        if self._csrf_refused(request, csrf_token):
-            return self._forgot(request, 403, errors={"identifier": [CSRF_REFUSED]},
-                                identifier=identifier)
-        if not identifier:
-            return self._forgot(request, 422,
-                                errors={"identifier": ["Enter your user ID or email."]})
-        if self._throttle is not None:
-            keys = throttle_keys(identifier, self.client_address(request))
-            status = await self._throttle.check(*keys)
-            if status.allowed:
-                await self._throttle.record_failure(*keys)
-            elif status.retry_after is not None:
-                error = lockout_message("reset requests", status.retry_after)
-                headers = {"Retry-After": str(status.retry_after_seconds)}
-                return self._forgot(request, 429, headers,
-                                    errors={"identifier": [error]}, identifier=identifier)
-        account = await self.find_account(identifier)
-        if account is not None:
-            await self._email_link(request, *account)
-        return self._forgot(request, sent=True, identifier=identifier)
+        return await self._identifier_submit(
+            request, identifier, csrf_token, render=self._forgot, find=self.find_account,
+            send=self._send_reset_link, lockout_what="reset requests", log=logger,
+            log_what="password reset email",
+        )
 
-    async def _email_link(self, request: Request, subject: str, address: str) -> None:
-        try:
-            token = await self._tokens.issue(subject, self.PURPOSE, lifetime=self.token_lifetime)
-            link = absolute_url(request.app, f"{self.reset_url}/{token}")
-            await send_email(request.app, self.reset_email(address, link))
-        except (EmailDeliveryError, EmailNotConfiguredError, RuntimeError, ValueError) as exc:
-            logger.warning("password reset email for %s not sent: %s", subject, exc)
+    async def _send_reset_link(self, request: Request, subject: str, address: str) -> None:
+        await self._email_link(request, subject, address, self.reset_url, self.reset_email)
 
     # choose a new password
 
     def _reset(self, request: Request, token: str, status_code: int = 200, **extra):
         context = {"action": f"{self.reset_url}/{token}", "login_url": self.login_url,
-                   "min_password_length": self.min_password_length,
-                   **self._csrf_context(request), **extra}
-        response = self._templates.TemplateResponse(request, self.reset_template, context,
-                                                    status_code=status_code)
-        return self._with_csrf_cookie(request, response)
+                   "min_password_length": self.min_password_length, **extra}
+        return self._render_form(request, self.reset_template, context, status_code=status_code)
 
     def _invalid(self, request: Request, token: str):
         return self._reset(request, token, 400, invalid=True, forgot_url=self.forgot_url)
@@ -202,10 +145,10 @@ class PasswordResetViews(CsrfProtected, ABC):
         if self._csrf_refused(request, csrf_token):
             return self._reset(request, token, 403, errors={"__all__": [CSRF_REFUSED]})
         errors: dict[str, list[str]] = {}
-        if len(password) < self.min_password_length:
-            errors["password"] = [f"Use at least {self.min_password_length} characters."]
-        elif password != password_confirm:
-            errors["password_confirm"] = ["The passwords don't match."]
+        problem = password_problem(password, password_confirm, min_length=self.min_password_length)
+        if problem:
+            field, message = problem
+            errors["password" if field == "new" else "password_confirm"] = [message]
         if errors:
             if await self._tokens.peek(token, self.PURPOSE) is None:
                 return self._invalid(request, token)

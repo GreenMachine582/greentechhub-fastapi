@@ -22,18 +22,19 @@ confirm it, optionally before they can sign in.
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from greentechhub_core.email import EmailDeliveryError, EmailNotConfiguredError
+from greentechhub_core.email import EMAIL_INVALID, email_looks_valid
 from greentechhub_core.identity import DevelopmentIdentityProvider, Identity
+from greentechhub_core.security import password_problem
 
 from greentechhub_fastapi.auth.cookies import create_session_cookie
 from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
-from greentechhub_fastapi.email import email_looks_valid
+from greentechhub_fastapi.auth.errors import FormErrors
+from greentechhub_fastapi.email import EMAIL_SEND_ERRORS
 
 if TYPE_CHECKING:
     from greentechhub_fastapi.auth.verify import EmailVerificationViews
@@ -41,14 +42,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class RegistrationError(Exception):
+class RegistrationError(FormErrors):
     """Raised by `RegisterViews.create_user` for an expected refusal, e.g. a
     user ID that's taken. `errors` maps form fields ("user_id", "password")
     to their messages; the form is shown again with them, status 422."""
-
-    def __init__(self, errors: Mapping[str, list[str]]) -> None:
-        super().__init__("; ".join(m for messages in errors.values() for m in messages))
-        self.errors = {field: list(messages) for field, messages in errors.items()}
 
 
 class RegisterViews(CsrfProtected, ABC):
@@ -171,19 +168,16 @@ class RegisterViews(CsrfProtected, ABC):
                 if self.require_email:
                     errors["email"] = ["Enter your email address."]
             elif not email_looks_valid(email):
-                errors["email"] = ["Enter an email address, like name@example.com."]
-        if len(password) < self.min_password_length:
-            errors["password"] = [f"Use at least {self.min_password_length} characters."]
-        elif password != password_confirm:
-            errors["password_confirm"] = ["The passwords don't match."]
+                errors["email"] = [EMAIL_INVALID]
+        problem = password_problem(password, password_confirm, min_length=self.min_password_length)
+        if problem:
+            field, message = problem
+            errors["password" if field == "new" else "password_confirm"] = [message]
         return errors
 
     def _render(self, request: Request, status_code: int = 200, **extra):
-        context = self._context(**self._csrf_context(request), **extra)
-        response = self._templates.TemplateResponse(
-            request, self.register_template, context, status_code=status_code
-        )
-        return self._with_csrf_cookie(request, response)
+        return self._render_form(request, self.register_template, self._context(**extra),
+                                 status_code=status_code)
 
     async def _register_form(self, request: Request):
         await self._require_open(request)
@@ -221,7 +215,7 @@ class RegisterViews(CsrfProtected, ABC):
         if verification is not None and email:
             try:
                 await verification.send_link(request, identity.subject, email)
-            except (EmailDeliveryError, EmailNotConfiguredError, RuntimeError, ValueError) as exc:
+            except EMAIL_SEND_ERRORS as exc:
                 logger.warning("confirmation email for %s not sent: %s", identity.subject, exc)
             if not self.sign_in_before_verified:
                 return self._render(request, verify_sent=True, email=email,

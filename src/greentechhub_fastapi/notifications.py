@@ -27,7 +27,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
-from greentechhub_core.email import EmailDeliveryError, EmailNotConfiguredError, new_email
+from greentechhub_core.email import new_email
 from greentechhub_core.identity import Identity
 from greentechhub_core.notifications import (
     Notification,
@@ -39,6 +39,7 @@ from greentechhub_core.notifications import (
 from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.dependencies.identity import require_page_identity
 from greentechhub_fastapi.email import (
+    EMAIL_SEND_ERRORS,
     EMAIL_STATE_KEY,
     absolute_url,
     recipient_address,
@@ -136,7 +137,7 @@ async def _email_notification(app: Any, recipient: Identity | str,
         text += f"\n\n{notification.action_label}: {absolute_url(app, notification.action_url)}"
     try:
         await send_email(app, new_email(address, subject, text))
-    except (EmailDeliveryError, EmailNotConfiguredError, ValueError) as exc:
+    except EMAIL_SEND_ERRORS as exc:
         logger.warning("notification %s not emailed to %s: %s",
                        notification.id, notification.recipient, exc)
 
