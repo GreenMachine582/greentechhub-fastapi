@@ -13,33 +13,19 @@ mail problem there is logged rather than shown, as with password reset.
 """
 
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Form, Request
-from fastapi.templating import Jinja2Templates
-from greentechhub_core.email import (
-    EmailDeliveryError,
-    EmailMessage,
-    EmailNotConfiguredError,
-    new_email,
-)
-from greentechhub_core.security import (
-    LoginThrottle,
-    OneTimeTokens,
-    lockout_message,
-    throttle_keys,
-)
+from greentechhub_core.email import EmailMessage, new_email
 
-from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
-from greentechhub_fastapi.auth.throttle import client_address
-from greentechhub_fastapi.email import absolute_url, send_email
+from greentechhub_fastapi.auth.emailed_link import EmailedLinkViews
 
 logger = logging.getLogger(__name__)
 
 
-class EmailVerificationViews(CsrfProtected, ABC):
+class EmailVerificationViews(EmailedLinkViews):
     """Subclass and implement `mark_verified()` and `find_unverified()`, then
     mount `.router()`; call `send_link()` wherever an address is set. Needs
     register_email (with `base_url`, so the link is absolute).
@@ -70,22 +56,8 @@ class EmailVerificationViews(CsrfProtected, ABC):
     #: The links' prefix; the resend form is at `{verify_url}/resend`.
     verify_url: str = "/verify-email"
 
-    #: The sign-in page, linked from both pages.
-    login_url: str = "/login"
-
     #: How long an emailed link works.
     token_lifetime: timedelta = timedelta(days=2)
-
-    def __init__(
-        self,
-        *,
-        templates: Jinja2Templates,
-        tokens: OneTimeTokens,
-        throttle: LoginThrottle | None = None,
-    ) -> None:
-        self._templates = templates
-        self._tokens = tokens
-        self._throttle = throttle
 
     @property
     def resend_url(self) -> str:
@@ -115,14 +87,8 @@ class EmailVerificationViews(CsrfProtected, ABC):
     async def send_link(self, request_or_app: Any, subject: str, address: str) -> None:
         """Email `address` a link that confirms it for `subject`. Mail errors
         (core's EmailDeliveryError / EmailNotConfiguredError) propagate."""
-        app = getattr(request_or_app, "app", request_or_app)
-        token = await self._tokens.issue(subject, self.PURPOSE, lifetime=self.token_lifetime)
-        link = absolute_url(app, f"{self.verify_url}/{token}")
-        await send_email(app, self.verify_email(address, link))
-
-    def client_address(self, request: Request) -> str | None:
-        """The address the throttle counts a client by, as LoginViews'."""
-        return client_address(request)
+        await self._email_link(request_or_app, subject, address, self.verify_url,
+                               self.verify_email)
 
     def router(self) -> APIRouter:
         router = APIRouter()
@@ -150,11 +116,9 @@ class EmailVerificationViews(CsrfProtected, ABC):
     # send it again
 
     def _resend(self, request: Request, status_code: int = 200, headers=None, **extra):
-        context = {"resend_url": self.resend_url, "login_url": self.login_url,
-                   **self._csrf_context(request), **extra}
-        response = self._templates.TemplateResponse(request, self.resend_template, context,
-                                                    status_code=status_code, headers=headers)
-        return self._with_csrf_cookie(request, response)
+        context = {"resend_url": self.resend_url, "login_url": self.login_url, **extra}
+        return self._render_form(request, self.resend_template, context,
+                                 status_code=status_code, headers=headers)
 
     async def _resend_form(self, request: Request):
         return self._resend(request)
@@ -162,28 +126,8 @@ class EmailVerificationViews(CsrfProtected, ABC):
     async def _resend_submit(
         self, request: Request, identifier: str = Form(""), csrf_token: str = Form("")
     ):
-        identifier = identifier.strip()
-        if self._csrf_refused(request, csrf_token):
-            return self._resend(request, 403, errors={"identifier": [CSRF_REFUSED]},
-                                identifier=identifier)
-        if not identifier:
-            return self._resend(request, 422,
-                                errors={"identifier": ["Enter your user ID or email."]})
-        if self._throttle is not None:
-            keys = throttle_keys(identifier, self.client_address(request))
-            status = await self._throttle.check(*keys)
-            if status.allowed:
-                await self._throttle.record_failure(*keys)
-            elif status.retry_after is not None:
-                error = lockout_message("requests", status.retry_after)
-                headers = {"Retry-After": str(status.retry_after_seconds)}
-                return self._resend(request, 429, headers,
-                                    errors={"identifier": [error]}, identifier=identifier)
-        account = await self.find_unverified(identifier)
-        if account is not None:
-            subject, address = account
-            try:
-                await self.send_link(request, subject, address)
-            except (EmailDeliveryError, EmailNotConfiguredError, RuntimeError, ValueError) as exc:
-                logger.warning("verification email for %s not sent: %s", subject, exc)
-        return self._resend(request, sent=True, identifier=identifier)
+        return await self._identifier_submit(
+            request, identifier, csrf_token, render=self._resend, find=self.find_unverified,
+            send=self.send_link, lockout_what="requests", log=logger,
+            log_what="verification email",
+        )

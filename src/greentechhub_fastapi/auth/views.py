@@ -156,7 +156,7 @@ class LoginViews(CsrfProtected, ABC):
         # whose package __init__ imports this module.
         from greentechhub_fastapi.settings import self_signup_open
 
-        context = {"login_url": self.login_url, **self._csrf_context(request), **extra}
+        context = {"login_url": self.login_url, **extra}
         if self.register_url and await self_signup_open(request):
             context["register_url"] = self.register_url
         if self.forgot_password_url:
@@ -164,11 +164,9 @@ class LoginViews(CsrfProtected, ABC):
         return context
 
     async def _render(self, request: Request, status_code: int = 200, headers=None, **extra):
-        response = self._templates.TemplateResponse(
-            request, self.login_template, await self._context(request, **extra),
-            status_code=status_code, headers=headers,
-        )
-        return self._with_csrf_cookie(request, response)
+        context = await self._context(request, **extra)
+        return self._render_form(request, self.login_template, context,
+                                 status_code=status_code, headers=headers)
 
     async def _login_form(self, request: Request):
         return await self._render(request)

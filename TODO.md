@@ -67,26 +67,6 @@ Shipped ahead of it: core-validated JSON filters (`validated_filter_json`, v0.12
   - **Done when:** each auth view's event lands in the store with actor, action, target and time, and the page
     lists them.
 
-### Leaner services — from the PyFinBot review (2026-10-07)
-Gaps that make PyFinBot hand-roll generic code, plus duplication inside this package. One PR each. F6 waits on
-greentechhub-core's C1/C2 (core TODO › Leaner services); the rest don't. PyFinBot's `todo.md` lists what it
-deletes when it adopts each.
-
-- [ ] F2. `fix(query)`: one error for bad query parameters
-  - **Why:** `PageParams.to_page_request` raises `HTTPException(422)` for malformed sort/filter input but core's
-    `BadRequestError` (400) when `fields=` validation fails. PyFinBot re-implements it (`api/query.py`) to get 400
-    everywhere.
-  - **Scope:** raise `BadRequestError` (`invalid_sort` / `invalid_filters`) in both cases.
-- [ ] F6. `refactor(auth)`: shared pieces in the auth views (after core C1/C2)
-  - **Why:** `PasswordResetViews` and `EmailVerificationViews` are near-identical (constructor, `client_address`,
-    the forgot/resend flow, issue → link → send). The CSRF render step is repeated 5×. The email-error tuple is
-    repeated 4×, and `notifications.py` leaves out `RuntimeError`. `RegistrationError` and `ProfileError` are the
-    same class.
-  - **Scope:**
-    - an emailed-link base class, `CsrfProtected._render_form`, one `EMAIL_SEND_ERRORS` and a `FormErrors` base;
-    - the registration readers and the password/email checks become calls to core's C1/C2.
-  - **Done when:** behaviour and messages unchanged, with the existing tests passing.
-
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
 one `register_*` call. Who wants it is noted where known.

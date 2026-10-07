@@ -27,7 +27,9 @@ CORS is bundled into `register_core` rather than a separate call — it reads al
   greentechhub-core's `GTHBaseSettings` (core v0.12+, lowercase: `auth_adapter`, …). A service's `Settings`
   gets them just by extending it and setting the env vars.
 - A service's own SCREAMING_CASE attribute, declared or set at runtime, still takes precedence when it's
-  non-empty. Both read the same env var, so they only differ after a runtime change.
+  non-empty. Both read the same env var, so they only differ after a runtime change. The readers are core's
+  (`greentechhub_core.config.setting_value` / `read_list_setting` / `read_str_setting` and
+  `permissions.read_role_map`, core v0.13), so every adapter reads them the same way.
 - Behind a reverse proxy, set `TRUSTED_PROXIES`. Without it every request looks like it came from the proxy,
   and per-client counts such as the login throttle's become one count for everybody.
 
