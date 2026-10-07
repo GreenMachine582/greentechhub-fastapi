@@ -92,10 +92,6 @@ deletes when it adopts each.
   - **Why:** `registration/logging.py` doesn't pass them to core's `configure_logging`, so PyFinBot calls core
     directly and re-routes uvicorn's loggers itself (`pyfinbot.py:57-65`).
   - **Scope:** both keywords, plus the uvicorn loggers through the root JSON handler (opt-out).
-- [ ] F4. `feat(query)`: a CSV export response
-  - **Why:** `TableState.export_url` is a gth feature, but each consumer writes the CSV response (PyFinBot's
-    `web/csv_response.py` with a BOM and attachment, and the ui playground's own).
-  - **Scope:** `csv_response(rows, headers, filename)` with the Excel BOM and Decimal/date formatting.
 - [ ] F5. `feat(htmx)`: triggers on template responses, and form errors
   - **Why:** `hx_response` only builds bodyless/plain responses, so PyFinBot and BottleBot set `HX-Trigger` on a
     `TemplateResponse` by hand (5 places in PyFinBot). PyFinBot also hand-maps pydantic errors to the field-errors

@@ -107,3 +107,23 @@ async def list_stocks(params: PageParams = Depends(), session=Depends(get_sessio
 `validated_filter_json(raw, fields, **limits)` does the same for a query builder's JSON posted in a form field. Any
 problem, malformed JSON included, is one `BadRequestError("invalid_filters")`; a parse problem is a single detail
 with `path` `None`.
+
+## CSV export
+
+A table's "Export CSV" link (greentechhub-ui's `TableState.export_url`) answers with `csv_download`, from
+`greentechhub_fastapi.downloads`:
+
+```python
+from greentechhub_fastapi.downloads import csv_download, csv_value
+
+@router.get("/transactions.csv")
+async def export(...):
+    rows = [HEADER, *([csv_value(t.date), csv_value(t.amount), t.notes or ""] for t in items)]
+    return csv_download(rows, "transactions.csv")
+```
+
+- `csv_download(rows, filename)` is a `text/csv; charset=utf-8` attachment that starts with a UTF-8 BOM. Excel
+  opens a CSV without one as Windows-1252, so text such as an en dash shows up garbled; with it, Excel, Numbers and
+  LibreOffice read UTF-8 (pandas: `encoding="utf-8-sig"`).
+- `csv_value(value)` turns a cell into text that reads back exactly: `None` becomes `""`, a `Decimal` keeps full
+  precision without trailing zeros or E-notation (`12.50` → `12.5`), and a date or datetime is ISO.
