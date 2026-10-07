@@ -15,6 +15,11 @@ register_health(app, checks=[check_database])
 register_auth(app, settings)      # picks local vs. forward_auth from settings.auth_adapter
 ```
 
+**Logging.** `register_logging` sets up greentechhub-core's JSON logging, one object per line at `LOG_LEVEL`.
+`register_logging(app, settings, service="pyfinbot", version=VERSION)` tags every line with the service and its
+version. `uvicorn=True` also sends uvicorn's own loggers through the same handler (it removes their plain-text
+handlers), so every line the process writes is JSON.
+
 CORS is bundled into `register_core` rather than a separate call — it reads allowed origins from a `CORS_ALLOWED_ORIGINS`-style field on the service's `Settings`, defaulting to empty/restrictive so a service is safe out of the box and one env var away from configured.
 
 **Where the settings come from.**
