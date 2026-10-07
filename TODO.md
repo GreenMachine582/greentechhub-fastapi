@@ -96,12 +96,6 @@ deletes when it adopts each.
   - **Why:** `TableState.export_url` is a gth feature, but each consumer writes the CSV response (PyFinBot's
     `web/csv_response.py` with a BOM and attachment, and the ui playground's own).
   - **Scope:** `csv_response(rows, headers, filename)` with the Excel BOM and Decimal/date formatting.
-- [ ] F5. `feat(htmx)`: triggers on template responses, and form errors
-  - **Why:** `hx_response` only builds bodyless/plain responses, so PyFinBot and BottleBot set `HX-Trigger` on a
-    `TemplateResponse` by hand (5 places in PyFinBot). PyFinBot also hand-maps pydantic errors to the field-errors
-    dict ui's forms take.
-  - **Scope:** `with_triggers(response, trigger)` (or `hx_response(..., response=)`) and
-    `field_errors(validation_error)`.
 - [ ] F6. `refactor(auth)`: shared pieces in the auth views (after core C1/C2)
   - **Why:** `PasswordResetViews` and `EmailVerificationViews` are near-identical (constructor, `client_address`,
     the forgot/resend flow, issue → link → send). The CSRF render step is repeated 5×. The email-error tuple is
