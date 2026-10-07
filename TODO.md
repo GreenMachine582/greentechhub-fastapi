@@ -72,30 +72,11 @@ Gaps that make PyFinBot hand-roll generic code, plus duplication inside this pac
 greentechhub-core's C1/C2 (core TODO › Leaner services); the rest don't. PyFinBot's `todo.md` lists what it
 deletes when it adopts each.
 
-- [ ] F1. `feat(auth)`: bearer-token API auth
-  - **Why:** only the session cookie is resolved (`auth/local.py`). PyFinBot hand-rolls its API's JWTs
-    (`core/security.py`), a bearer `get_current_user` and an API `require_permission` (`core/dependencies.py`,
-    building an `Identity` by hand), duplicating core's `DevelopmentIdentityProvider`. The two token kinds share
-    a secret and HS256, so each is accepted as the other today.
-  - **Scope:**
-    - a bearer dependency resolving `Authorization: Bearer` through the same provider (`get_bearer_identity`, 401
-      envelope + `WWW-Authenticate`);
-    - `require_api_permission(permission)` for API routes;
-    - a token-login helper on `throttled_login` that issues through the provider.
-  - **Done when:** an OAuth2 password route plus bearer-protected routes need no JWT code in the service.
 - [ ] F2. `fix(query)`: one error for bad query parameters
   - **Why:** `PageParams.to_page_request` raises `HTTPException(422)` for malformed sort/filter input but core's
     `BadRequestError` (400) when `fields=` validation fails. PyFinBot re-implements it (`api/query.py`) to get 400
     everywhere.
   - **Scope:** raise `BadRequestError` (`invalid_sort` / `invalid_filters`) in both cases.
-- [ ] F3. `feat(logging)`: `register_logging(service=, version=)`
-  - **Why:** `registration/logging.py` doesn't pass them to core's `configure_logging`, so PyFinBot calls core
-    directly and re-routes uvicorn's loggers itself (`pyfinbot.py:57-65`).
-  - **Scope:** both keywords, plus the uvicorn loggers through the root JSON handler (opt-out).
-- [ ] F4. `feat(query)`: a CSV export response
-  - **Why:** `TableState.export_url` is a gth feature, but each consumer writes the CSV response (PyFinBot's
-    `web/csv_response.py` with a BOM and attachment, and the ui playground's own).
-  - **Scope:** `csv_response(rows, headers, filename)` with the Excel BOM and Decimal/date formatting.
 - [ ] F6. `refactor(auth)`: shared pieces in the auth views (after core C1/C2)
   - **Why:** `PasswordResetViews` and `EmailVerificationViews` are near-identical (constructor, `client_address`,
     the forgot/resend flow, issue → link → send). The CSRF render step is repeated 5×. The email-error tuple is

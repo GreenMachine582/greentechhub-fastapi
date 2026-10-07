@@ -81,9 +81,9 @@ def test_problems_are_a_400_with_a_detail_per_clause():
     assert [(d["path"], d["field"]) for d in body["details"]] == [("0", "secret"), ("1.0", "stock")]
 
 
-def test_malformed_input_is_still_a_422():
+def test_malformed_input_is_a_400_too():
     response = _get(_app(), filters="{not json")
-    assert response.status_code == 422
+    assert response.status_code == 400
 
 
 def test_limits_pass_through():

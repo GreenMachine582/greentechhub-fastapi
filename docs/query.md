@@ -54,7 +54,8 @@ async def stock_rows(request: Request, q: str = "",
   `sqlalchemy-filters` spec.
 - Values keep their JSON types, so `5` stays a number. `in` / `not_in` take a list; `is_null` takes `true`/`false`.
 - There's no `not` group: negate per clause (`ne`, `not_in`, `is_null: false`), as core does. Groups nest at most
-  `MAX_FILTER_DEPTH` (5) deep. Anything malformed is a 422 with the reason in `detail`.
+  `MAX_FILTER_DEPTH` (5) deep. Anything malformed is a 400 (`QueryParamError`) with the reason in `detail`; under
+  `register_api_error_handlers` it's the envelope with `code` `"invalid_filters"` (or `"invalid_sort"`).
 
 The result goes straight into greentechhub-core's SQLAlchemy helpers, with the field allow-list applied there:
 
@@ -98,7 +99,8 @@ async def list_stocks(params: PageParams = Depends(), session=Depends(get_sessio
 - Only those fields, the operators each type takes, and values that fit. Values come back converted: `"10"` becomes
   `10` for a number, `"2026-01-31"` a `date`, `"true"` a bool. List the same keys in `ALLOWED`, which maps them to
   columns.
-- Malformed input is still a 422. A problem with a well-formed filter raises core's `BadRequestError`, which the
+- Malformed input is a 400 too (`QueryParamError`: `invalid_sort` / `invalid_filters`). A problem with a well-formed
+  filter raises core's `BadRequestError`, which the
   exception handlers (`register_exception_handlers` / `register_api_error_handlers`) answer **400**:
   `{"code": "invalid_filters", "message", "details": [{"path": "1.0", "field": "stock", "message": ...}]}`. `path`
   is the clause's index, dotted through groups, so greentechhub-ui's query builder can mark the row.
@@ -107,3 +109,23 @@ async def list_stocks(params: PageParams = Depends(), session=Depends(get_sessio
 `validated_filter_json(raw, fields, **limits)` does the same for a query builder's JSON posted in a form field. Any
 problem, malformed JSON included, is one `BadRequestError("invalid_filters")`; a parse problem is a single detail
 with `path` `None`.
+
+## CSV export
+
+A table's "Export CSV" link (greentechhub-ui's `TableState.export_url`) answers with `csv_download`, from
+`greentechhub_fastapi.downloads`:
+
+```python
+from greentechhub_fastapi.downloads import csv_download, csv_value
+
+@router.get("/transactions.csv")
+async def export(...):
+    rows = [HEADER, *([csv_value(t.date), csv_value(t.amount), t.notes or ""] for t in items)]
+    return csv_download(rows, "transactions.csv")
+```
+
+- `csv_download(rows, filename)` is a `text/csv; charset=utf-8` attachment that starts with a UTF-8 BOM. Excel
+  opens a CSV without one as Windows-1252, so text such as an en dash shows up garbled; with it, Excel, Numbers and
+  LibreOffice read UTF-8 (pandas: `encoding="utf-8-sig"`).
+- `csv_value(value)` turns a cell into text that reads back exactly: `None` becomes `""`, a `Decimal` keeps full
+  precision without trailing zeros or E-notation (`12.50` → `12.5`), and a date or datetime is ISO.
