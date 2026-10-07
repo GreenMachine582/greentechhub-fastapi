@@ -68,7 +68,10 @@ def register_api_error_handlers(
     async def _http_exception(request: Request, exc: StarletteHTTPException) -> Response:
         if not _is_api(request):
             return await http_exception_handler(request, exc)
-        code = HTTP_STATUS_CODES.get(exc.status_code, f"http_{exc.status_code}")
+        # An HTTPException can name its own code (e.g. query.QueryParamError's
+        # invalid_sort); otherwise the status picks it.
+        code = getattr(exc, "code", None) or HTTP_STATUS_CODES.get(
+            exc.status_code, f"http_{exc.status_code}")
         headers = getattr(exc, "headers", None)
         return _envelope(exc.status_code, code, str(exc.detail), headers=headers)
 
