@@ -28,10 +28,28 @@ from greentechhub_core.identity import DevelopmentIdentityProvider, Identity, Ra
 from greentechhub_fastapi.auth.cookies import SESSION_COOKIE_NAME
 
 
+def bearer_token(request: Request) -> str | None:
+    """The token in an `Authorization: Bearer <token>` header, or None."""
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer":
+        return None
+    return token.strip() or None
+
+
 def build_local_get_current_user(
-    provider: DevelopmentIdentityProvider, *, cookie_name: str = SESSION_COOKIE_NAME
+    provider: DevelopmentIdentityProvider,
+    *,
+    cookie_name: str = SESSION_COOKIE_NAME,
+    bearer: bool = False,
 ) -> Callable[[Request], Awaitable[Identity | None]]:
+    """The local adapter's get_current_user: the session cookie's identity.
+    With `bearer`, an `Authorization: Bearer` token is resolved first (an
+    API client's token from issue_token): when the header is there, it
+    alone decides, so a bad token never falls back to a cookie."""
+
     async def _get_current_user(request: Request) -> Identity | None:
+        if bearer and (token := bearer_token(request)):
+            return await provider.resolve(RawAuthContext(token=token))
         token = request.cookies.get(cookie_name)
         if not token:
             return None

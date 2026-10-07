@@ -72,17 +72,6 @@ Gaps that make PyFinBot hand-roll generic code, plus duplication inside this pac
 greentechhub-core's C1/C2 (core TODO › Leaner services); the rest don't. PyFinBot's `todo.md` lists what it
 deletes when it adopts each.
 
-- [ ] F1. `feat(auth)`: bearer-token API auth
-  - **Why:** only the session cookie is resolved (`auth/local.py`). PyFinBot hand-rolls its API's JWTs
-    (`core/security.py`), a bearer `get_current_user` and an API `require_permission` (`core/dependencies.py`,
-    building an `Identity` by hand), duplicating core's `DevelopmentIdentityProvider`. The two token kinds share
-    a secret and HS256, so each is accepted as the other today.
-  - **Scope:**
-    - a bearer dependency resolving `Authorization: Bearer` through the same provider (`get_bearer_identity`, 401
-      envelope + `WWW-Authenticate`);
-    - `require_api_permission(permission)` for API routes;
-    - a token-login helper on `throttled_login` that issues through the provider.
-  - **Done when:** an OAuth2 password route plus bearer-protected routes need no JWT code in the service.
 - [ ] F2. `fix(query)`: one error for bad query parameters
   - **Why:** `PageParams.to_page_request` raises `HTTPException(422)` for malformed sort/filter input but core's
     `BadRequestError` (400) when `fields=` validation fails. PyFinBot re-implements it (`api/query.py`) to get 400
