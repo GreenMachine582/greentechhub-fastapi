@@ -88,10 +88,6 @@ deletes when it adopts each.
     `BadRequestError` (400) when `fields=` validation fails. PyFinBot re-implements it (`api/query.py`) to get 400
     everywhere.
   - **Scope:** raise `BadRequestError` (`invalid_sort` / `invalid_filters`) in both cases.
-- [ ] F3. `feat(logging)`: `register_logging(service=, version=)`
-  - **Why:** `registration/logging.py` doesn't pass them to core's `configure_logging`, so PyFinBot calls core
-    directly and re-routes uvicorn's loggers itself (`pyfinbot.py:57-65`).
-  - **Scope:** both keywords, plus the uvicorn loggers through the root JSON handler (opt-out).
 - [ ] F4. `feat(query)`: a CSV export response
   - **Why:** `TableState.export_url` is a gth feature, but each consumer writes the CSV response (PyFinBot's
     `web/csv_response.py` with a BOM and attachment, and the ui playground's own).
