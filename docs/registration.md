@@ -15,6 +15,11 @@ register_health(app, checks=[check_database])
 register_auth(app, settings)      # picks local vs. forward_auth from settings.auth_adapter
 ```
 
+**Logging.** `register_logging` sets up greentechhub-core's JSON logging, one object per line at `LOG_LEVEL`.
+`register_logging(app, settings, service="pyfinbot", version=VERSION)` tags every line with the service and its
+version. `uvicorn=True` also sends uvicorn's own loggers through the same handler (it removes their plain-text
+handlers), so every line the process writes is JSON.
+
 CORS is bundled into `register_core` rather than a separate call — it reads allowed origins from a `CORS_ALLOWED_ORIGINS`-style field on the service's `Settings`, defaulting to empty/restrictive so a service is safe out of the box and one env var away from configured.
 
 **Where the settings come from.**
@@ -22,7 +27,9 @@ CORS is bundled into `register_core` rather than a separate call — it reads al
   greentechhub-core's `GTHBaseSettings` (core v0.12+, lowercase: `auth_adapter`, …). A service's `Settings`
   gets them just by extending it and setting the env vars.
 - A service's own SCREAMING_CASE attribute, declared or set at runtime, still takes precedence when it's
-  non-empty. Both read the same env var, so they only differ after a runtime change.
+  non-empty. Both read the same env var, so they only differ after a runtime change. The readers are core's
+  (`greentechhub_core.config.setting_value` / `read_list_setting` / `read_str_setting` and
+  `permissions.read_role_map`, core v0.13), so every adapter reads them the same way.
 - Behind a reverse proxy, set `TRUSTED_PROXIES`. Without it every request looks like it came from the proxy,
   and per-client counts such as the login throttle's become one count for everybody.
 

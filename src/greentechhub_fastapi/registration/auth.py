@@ -31,17 +31,26 @@ from greentechhub_core.identity import AuthentikIdentityProvider, DevelopmentIde
 from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.auth.forward_auth import build_forward_auth_get_current_user
 from greentechhub_fastapi.auth.local import build_local_get_current_user
+from greentechhub_fastapi.auth.tokens import IDENTITY_PROVIDER_STATE_KEY
 from greentechhub_fastapi.registration._settings import read_str_setting
 
 _KNOWN_ADAPTERS = ("local", "forward_auth")
 
 
-def register_auth(app: FastAPI, settings: GTHBaseSettings) -> None:
+def register_auth(app: FastAPI, settings: GTHBaseSettings, *, bearer: bool = False) -> None:
+    """Install AUTH_ADAPTER's get_current_user. With the local adapter,
+    `bearer=True` also accepts `Authorization: Bearer <token>` (tokens from
+    auth.issue_token), so API routes use the same get_current_identity /
+    require_permission as pages; forward_auth ignores it (Authentik signs
+    people in, not tokens)."""
     adapter = read_str_setting(settings, "AUTH_ADAPTER", "local")
 
     if adapter == "local":
         provider = DevelopmentIdentityProvider(secret_key=settings.secret_key)
-        app.dependency_overrides[get_current_user] = build_local_get_current_user(provider)
+        setattr(app.state, IDENTITY_PROVIDER_STATE_KEY, provider)
+        app.dependency_overrides[get_current_user] = build_local_get_current_user(
+            provider, bearer=bearer
+        )
         return
 
     if adapter == "forward_auth":

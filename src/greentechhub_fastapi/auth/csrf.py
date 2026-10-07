@@ -19,6 +19,8 @@ plain HTTP a non-goal.
 """
 
 import string
+from collections.abc import Mapping
+from typing import Any
 
 from fastapi import Request, Response
 from greentechhub_core.security import constant_time_compare, generate_token
@@ -63,6 +65,9 @@ class CsrfProtected:
     #: (or a template with the hidden `csrf_token` field).
     csrf: bool = False
 
+    #: The Jinja2Templates a view renders with (set by each view's __init__).
+    _templates: Any
+
     def _csrf_context(self, request: Request) -> dict[str, str]:
         if not self.csrf:
             return {}
@@ -78,3 +83,20 @@ class CsrfProtected:
 
     def _csrf_refused(self, request: Request, submitted: str | None) -> bool:
         return self.csrf and not csrf_ok(request, submitted)
+
+    def _render_form(
+        self,
+        request: Request,
+        template: str,
+        context: Mapping[str, Any],
+        *,
+        status_code: int = 200,
+        headers: Mapping[str, str] | None = None,
+    ) -> Response:
+        """`template` with `context` plus the CSRF token, and the CSRF cookie
+        set: how every one of these views renders a form page."""
+        response = self._templates.TemplateResponse(
+            request, template, {**self._csrf_context(request), **context},
+            status_code=status_code, headers=headers,
+        )
+        return self._with_csrf_cookie(request, response)

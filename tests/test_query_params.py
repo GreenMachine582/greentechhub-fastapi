@@ -68,17 +68,17 @@ def test_sort_and_filter_parsed_end_to_end():
     assert body["filters"] == [{"field": "status", "operator": "eq", "value": "active"}]
 
 
-def test_malformed_sort_returns_422_with_detail():
+def test_malformed_sort_returns_400_with_detail():
     app = _build_app()
     response = asyncio.run(_get(app, params={"sort": "-"}))
-    assert response.status_code == 422
+    assert response.status_code == 400
     assert "invalid sort clause" in response.json()["detail"]
 
 
-def test_malformed_filter_returns_422_with_detail():
+def test_malformed_filter_returns_400_with_detail():
     app = _build_app()
     response = asyncio.run(_get(app, params={"filter": "status:matches:active"}))
-    assert response.status_code == 422
+    assert response.status_code == 400
 
 
 # The JSON `filters` param: and/or groups alongside the flat `filter` string
@@ -112,7 +112,7 @@ def test_json_filters_and_the_flat_filter_combine():
     ]
 
 
-def test_malformed_json_filters_return_422_with_detail():
+def test_malformed_json_filters_return_400_with_detail():
     response = asyncio.run(_get(_groups_app(), params={"filters": '{"not": {}}'}))
-    assert response.status_code == 422
+    assert response.status_code == 400
     assert "not supported" in response.json()["detail"]

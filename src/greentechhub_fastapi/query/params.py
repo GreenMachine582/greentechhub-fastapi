@@ -13,8 +13,9 @@ verified that a validator raising ValueError on a Params subclass resolved
 through Depends() does not become a clean 422 — it surfaces as an unhandled
 pydantic_core.ValidationError, i.e. a bare 500. Instead, to_page_request()
 below calls the plain parsing.py functions itself and turns a ValueError into
-an explicit fastapi.HTTPException(422, ...), which does produce a clean,
-documented error response. Do not "simplify" this back into a validator.
+a QueryParamError (a 400 HTTPException with a code), which does produce a
+clean, documented error response. Do not "simplify" this back into a
+validator.
 """
 
 from collections.abc import Iterable, Mapping
@@ -25,6 +26,17 @@ from greentechhub_core.query import FilterField, validate_filters
 from greentechhub_core.query.types import PageRequest
 
 from greentechhub_fastapi.query.parsing import parse_filter_json, parse_filters, parse_sort
+
+
+class QueryParamError(HTTPException):
+    """A malformed sort/filter/filters value: 400, the reason as `detail`,
+    and a `code` ("invalid_sort" or "invalid_filters") that
+    register_api_error_handlers puts in the envelope. A plain HTTPException,
+    so an app without those handlers still answers a clean 400."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(status_code=400, detail=message)
+        self.code = code
 
 
 class PageParams(Params):
@@ -53,10 +65,11 @@ class PageParams(Params):
         `filter` (the flat string) and `filters` (JSON, with and/or groups)
         may both be given; their clauses are AND-ed together.
 
-        A malformed sort/filter/filters value raises HTTPException(422) with the
-        underlying ValueError's message as `detail` — page/size are already
-        validated natively by the inherited Params fields' ge/le constraints,
-        so no equivalent handling is needed for them here.
+        A malformed sort raises QueryParamError("invalid_sort"), a malformed
+        filter/filters QueryParamError("invalid_filters"): a 400 with the
+        reason as `detail` (the API envelope's `message`). page/size are
+        validated natively by the inherited Params fields' ge/le constraints
+        (FastAPI's 422).
 
         With `fields` (core FilterFields), the clauses also go through core's
         validate_filters: only those fields, the operators each type takes,
@@ -67,9 +80,12 @@ class PageParams(Params):
         """
         try:
             sort = parse_sort(self.sort)
+        except ValueError as exc:
+            raise QueryParamError("invalid_sort", f"Invalid 'sort': {exc}") from exc
+        try:
             filters = [*parse_filters(self.filter), *parse_filter_json(self.filters)]
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise QueryParamError("invalid_filters", f"Invalid 'filters': {exc}") from exc
         if fields is not None:
             filters = validate_filters(filters, fields, max_depth=max_depth,
                                        max_filters=max_filters, max_values=max_values)

@@ -38,16 +38,17 @@ register_auth installed, and an admin can come from ROLE_BOOTSTRAP
 
 import inspect
 import logging
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 from fastapi.templating import Jinja2Templates
-from greentechhub_core.email import EmailDeliveryError, EmailNotConfiguredError
+from greentechhub_core.email import EMAIL_INVALID, email_looks_valid
 from greentechhub_core.identity import Identity
 from greentechhub_core.permissions import Permission
+from greentechhub_core.security import password_problem
 from greentechhub_core.settings import (
     Setting,
     SettingPermissionError,
@@ -64,8 +65,9 @@ from greentechhub_core.settings.builtins import (
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from greentechhub_fastapi.auth.dependency import get_current_user
+from greentechhub_fastapi.auth.errors import FormErrors
 from greentechhub_fastapi.dependencies.identity import require_page_identity
-from greentechhub_fastapi.email import email_looks_valid
+from greentechhub_fastapi.email import EMAIL_SEND_ERRORS
 from greentechhub_fastapi.htmx import _toast_trigger
 from greentechhub_fastapi.notifications import NOTIFICATIONS_STATE_KEY
 from greentechhub_fastapi.permissions import _GRANTED_STATE_KEY, RESOLVER_STATE_KEY
@@ -93,14 +95,10 @@ class Profile:
     email: str = ""
 
 
-class ProfileError(Exception):
+class ProfileError(FormErrors):
     """Raised by a `save_profile` hook for an expected refusal, e.g. an email
     that's taken. `errors` maps fields ("display_name", "email") to their
     messages; the section is shown again with them, status 422."""
-
-    def __init__(self, errors: Mapping[str, list[str]]) -> None:
-        super().__init__("; ".join(m for messages in errors.values() for m in messages))
-        self.errors = {field: list(messages) for field, messages in errors.items()}
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -569,7 +567,7 @@ class SettingsViews:
                 f"Use at most {self.max_display_name_length} characters."
             ]
         if profile.email and not email_looks_valid(profile.email):
-            errors["email"] = ["Enter an email address, like name@example.com."]
+            errors["email"] = [EMAIL_INVALID]
         return errors
 
     async def _save_profile_section(self, request: Request, user: Identity):
@@ -608,7 +606,7 @@ class SettingsViews:
         assert self._verification is not None
         try:
             await self._verification.send_link(request, user.subject, email)
-        except (EmailDeliveryError, EmailNotConfiguredError, RuntimeError, ValueError) as exc:
+        except EMAIL_SEND_ERRORS as exc:
             logger.warning("confirmation email for %s not sent: %s", user.subject, exc)
             return "Profile saved, but the confirmation email couldn't be sent."
         return f"Profile saved. We've emailed a link to confirm {email}."
@@ -649,12 +647,11 @@ class SettingsViews:
         errors: dict[str, list[str]] = {}
         if not current:
             errors["current_password"] = ["Enter your current password."]
-        if len(new) < self.min_password_length:
-            errors["new_password"] = [f"Use at least {self.min_password_length} characters."]
-        elif new == current:
-            errors["new_password"] = ["Choose a password different from your current one."]
-        elif new != confirm:
-            errors["new_password_confirm"] = ["The passwords don't match."]
+        problem = password_problem(new, confirm, min_length=self.min_password_length,
+                                   current=current)
+        if problem:
+            field, message = problem
+            errors["new_password" if field == "new" else "new_password_confirm"] = [message]
         if not errors and not await self._change_password(user, current, new):
             errors["current_password"] = ["That isn't your current password."]
         if errors:
