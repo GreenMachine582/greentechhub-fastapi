@@ -115,7 +115,7 @@ async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
                                  address=client_address(request))
     if user is None:
         raise UnauthorizedError("Incorrect user ID or password")
-    return {"access_token": issue_token(user), "token_type": "bearer"}
+    return {"access_token": issue_token(request, user), "token_type": "bearer"}
 ```
 
 - It checks the lock first and raises `LoginLockedOut` (429, `Retry-After`, the same "Too many failed sign-ins"
@@ -126,6 +126,38 @@ async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
 - The keys (`throttle_keys`), the Retry-After seconds (`ThrottleStatus.retry_after_seconds`) and the message
   (`lockout_message`) are greentechhub-core's, the same ones `LoginViews`, `PasswordResetViews` and
   `EmailVerificationViews` use.
+
+**API tokens (local adapter).** `register_auth(app, settings, bearer=True)` makes `get_current_user` also resolve an
+`Authorization: Bearer <token>` header. `issue_token(request, identity)` signs that token with the same provider as
+the session cookie. API routes then use the same `get_current_identity` and `require_permission` as pages, with no
+JWT code in the service:
+
+```python
+from greentechhub_fastapi.auth import bearer_scheme, issue_token
+
+register_auth(app, settings, bearer=True)
+api = APIRouter(prefix="/api", dependencies=[Depends(bearer_scheme("/api/auth/login"))])
+
+@api.post("/auth/login")
+async def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
+    identity = await throttled_login(throttle, form.username, check, address=client_address(request))
+    if identity is None:
+        raise UnauthorizedError("Incorrect user ID or password")
+    return {"access_token": issue_token(request, identity, expires_in=timedelta(hours=24)),
+            "token_type": "bearer"}
+
+@api.get("/things")
+async def things(identity: Identity = Depends(require_permission("things.view"))): ...
+```
+
+- When the header is present it alone decides: a bad or expired token is anonymous (401 envelope with
+  `WWW-Authenticate: Bearer`) and never falls back to the cookie. Without the header, the cookie works as before.
+- `issue_token` (default 12 hours) raises `RuntimeError` unless the local adapter is registered. `forward_auth`
+  ignores `bearer`, because Authentik signs people in, not tokens.
+- `bearer_scheme(token_url)` only documents the scheme in OpenAPI (`auto_error=False`), so Swagger's Authorize
+  button works. The checking is done by `get_current_identity` / `require_permission`.
+- An API token and a session cookie are the same kind of JWT, so either works in either place. Both are stateless,
+  so a stolen one is valid until it expires.
 
 **Sign-up: `RegisterViews`** (`greentechhub_fastapi.auth.RegisterViews`) is the same idea for self-service sign-up:
 `GET`/`POST /register`, with only storing the new user left to fill in:
