@@ -5,6 +5,13 @@ version). From v0.8.0 on, entries are written by [release-please](https://github
 from conventional commits; the same notes are published as
 [GitHub Releases](https://github.com/GreenMachine582/greentechhub-fastapi/releases).
 
+## [0.15.1](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.15.0...v0.15.1) (2026-10-09)
+
+
+### Build
+
+* **deps:** core v0.14.0 ([#70](https://github.com/GreenMachine582/greentechhub-fastapi/issues/70)) ([6f41523](https://github.com/GreenMachine582/greentechhub-fastapi/commit/6f41523641a48a50d5a201ce88deb014617b238f))
+
 ## [0.15.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.14.0...v0.15.0) (2026-10-07)
 
 
