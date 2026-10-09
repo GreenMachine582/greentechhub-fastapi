@@ -48,12 +48,16 @@ greentechhub_fastapi.notifications.
 
 register_email likewise; send_email, get_email_sender and recipient_address
 live in greentechhub_fastapi.email.
+
+register_csrf likewise; require_csrf and CsrfMiddleware live in
+greentechhub_fastapi.auth.csrf.
 """
 
 from greentechhub_fastapi.exceptions import register_api_error_handlers, register_exception_handlers
 from greentechhub_fastapi.registration import (
     register_auth,
     register_core,
+    register_csrf,
     register_email,
     register_events,
     register_flash,
@@ -68,6 +72,7 @@ __all__ = [
     "register_api_error_handlers",
     "register_auth",
     "register_core",
+    "register_csrf",
     "register_email",
     "register_events",
     "register_exception_handlers",

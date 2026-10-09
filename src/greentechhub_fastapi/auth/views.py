@@ -49,7 +49,7 @@ from greentechhub_core.identity import DevelopmentIdentityProvider, Identity
 from greentechhub_core.security import LoginThrottle
 
 from greentechhub_fastapi.auth.cookies import clear_session_cookie, create_session_cookie
-from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
+from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected, require_csrf
 from greentechhub_fastapi.auth.throttle import LoginLockedOut, client_address, throttled_login
 
 
@@ -81,6 +81,12 @@ class LoginViews(CsrfProtected, ABC):
     #: failed login (the user ID is kept so it needn't be retyped; the
     #: password never is). Set your own template name to keep a custom page.
     login_template: str = "login_page.html"
+
+    #: Check a CSRF token on POST /logout too (opt-in, v0.16): the navbar's
+    #: logout form carries one from greentechhub-ui's app shell once
+    #: register_csrf runs. Without it, a page on another site could sign
+    #: someone out. 403 when it's missing or wrong.
+    logout_csrf: bool = False
 
     #: Where a successful login redirects to — or, when the service registered
     #: core's landing_page_setting, the fallback if it can't be resolved.
@@ -205,7 +211,9 @@ class LoginViews(CsrfProtected, ABC):
         create_session_cookie(response, token)
         return response
 
-    async def _logout(self):
+    async def _logout(self, request: Request):
+        if self.logout_csrf:
+            await require_csrf(request)
         response = RedirectResponse(url=self.login_url, status_code=303)
         clear_session_cookie(response)
         return response

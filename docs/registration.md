@@ -46,6 +46,10 @@ class Settings(GTHBaseSettings):
 
 `greentechhub-core` is still imported directly for pure contracts (`Settings`, `Page`, `ApplicationError`) — only the framework-touching pieces route through this package.
 
+**CSRF.** `register_csrf(app)` gives every request a CSRF token for greentechhub-ui's app shell to send on htmx
+requests. `require_csrf` and the views' `csrf=True` / `logout_csrf` opt-ins then check it. See
+"CSRF on htmx forms" in [docs/auth.md](auth.md).
+
 ## Permissions
 
 `register_permissions` is opt-in: nothing checks permissions until a service calls it and puts a `require_*`

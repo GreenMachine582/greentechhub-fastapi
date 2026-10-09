@@ -41,20 +41,6 @@ ui drops its CDN-URL defaults, so services must mount `greentechhub_ui.static_di
 ### M5 Display & data — next
 Shipped ahead of it: core-validated JSON filters (`validated_filter_json`, v0.12) for ui's planned query builder.
 
-- [ ] 1. `feat(auth): CSRF for htmx forms`
-  - **Why:** the auth forms are covered (v0.13), but docs/auth.md lists what isn't: `POST /logout`,
-    `SettingsViews`, `RoleAdminViews` and a service's own htmx forms. These are the state-changing requests a
-    signed-in user makes all day.
-  - **Scope:**
-    - one token per browser, reusing the `gth_csrf` double-submit cookie;
-    - a `csrf_header_context` the page context exposes, so greentechhub-ui's app shell can put it in `hx-headers`
-      (`X-CSRF-Token`) and a hidden field on its logout form;
-    - a `require_csrf` dependency for POST/PUT/PATCH/DELETE page routes, answering 403 like the auth forms;
-    - opt-in on `register_settings` / `RoleAdminViews` / the logout route.
-  - **Needs:** a greentechhub-ui change to the app shell, planned with it. core already has `generate_token` and
-    `constant_time_compare`.
-  - **Done when:** a signed-in page's htmx POST without the header is refused, with it succeeds, and logout works
-    from the navbar.
 - [ ] 2. `feat(audit): register_audit`
   - **Why:** core ships an `AuditStore` (v0.10) with nothing writing to it. Services want "who signed in, who
     changed a role, when did the last sync run", and ui plans a `gth_timeline` to show it.

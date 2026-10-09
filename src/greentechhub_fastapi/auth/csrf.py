@@ -16,18 +16,34 @@ never needs it, since the server writes the token into the form. Over plain
 HTTP (local testing) a secure cookie isn't sent back, so every protected
 POST is refused; turn `csrf` off there, as the session cookie already makes
 plain HTTP a non-goal.
+
+Beyond the auth forms (opt-in, v0.16): register_csrf installs CsrfMiddleware,
+which gives every request the same token (reusing a well-formed cookie, else
+minting one and setting the cookie on the response), and templating's
+ui_context passes it to templates as `csrf_token`. greentechhub-ui's app
+shell then sends it on every htmx request as the X-CSRF-Token header and as
+a hidden field on the navbar's logout form. require_csrf checks either on a
+state-changing route; SettingsViews(csrf=True), RoleAdminViews(csrf=True)
+and LoginViews.logout_csrf opt this package's own routes in.
 """
 
 import string
 from collections.abc import Mapping
+from http.cookies import SimpleCookie
 from typing import Any
 
-from fastapi import Request, Response
+from fastapi import HTTPException, Request, Response
 from greentechhub_core.security import constant_time_compare, generate_token
+from starlette.datastructures import MutableHeaders
+from starlette.requests import HTTPConnection
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 CSRF_COOKIE_NAME = "gth_csrf"
 CSRF_FIELD = "csrf_token"
+CSRF_HEADER = "X-CSRF-Token"
 CSRF_REFUSED = "Your session expired. Please try again."
+
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 
 _STATE = "gth_csrf_token"
 _TOKEN_CHARS = frozenset(string.ascii_letters + string.digits + "-_")
@@ -54,6 +70,66 @@ def csrf_ok(request: Request, submitted: str | None) -> bool:
     empty one."""
     cookie = request.cookies.get(CSRF_COOKIE_NAME) or ""
     return bool(cookie) and bool(submitted) and constant_time_compare(cookie, submitted or "")
+
+
+def request_csrf_token(request: Request) -> str | None:
+    """The token CsrfMiddleware gave this request, or None without it."""
+    return getattr(request.state, _STATE, None)
+
+
+async def require_csrf(request: Request) -> None:
+    """A dependency for a state-changing route: a GET/HEAD/OPTIONS passes, any
+    other method needs the gth_csrf cookie's token back, as the X-CSRF-Token
+    header (htmx, through the app shell's hx-headers) or the csrf_token form
+    field (a plain form), else 403 with CSRF_REFUSED."""
+    if request.method in SAFE_METHODS:
+        return
+    submitted = request.headers.get(CSRF_HEADER)
+    if not submitted and request.headers.get("content-type", "").startswith(
+        ("application/x-www-form-urlencoded", "multipart/form-data")
+    ):
+        submitted = str((await request.form()).get(CSRF_FIELD) or "")
+    if not csrf_ok(request, submitted):
+        raise HTTPException(status_code=403, detail=CSRF_REFUSED)
+
+
+class CsrfMiddleware:
+    """Gives every HTTP request a CSRF token (register_csrf installs it): the
+    request's well-formed gth_csrf cookie, else a fresh token, which is then
+    set as the cookie on the response. The token sits on request.state, where
+    request_csrf_token, ui_context and the auth views' forms all find it, so
+    a page and its forms always agree. Checks nothing itself: that's
+    require_csrf."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        cookie = HTTPConnection(scope).cookies.get(CSRF_COOKIE_NAME)
+        fresh = cookie is None or not _well_formed(cookie)
+        token = generate_token() if fresh else cookie
+        scope.setdefault("state", {})[_STATE] = token
+
+        async def send_with_cookie(message: Message) -> None:
+            if message["type"] == "http.response.start" and fresh:
+                headers = MutableHeaders(scope=message)
+                if not _sets_csrf_cookie(headers):
+                    morsel = SimpleCookie()
+                    morsel[CSRF_COOKIE_NAME] = token
+                    morsel[CSRF_COOKIE_NAME].update(
+                        {"httponly": True, "secure": True, "samesite": "lax", "path": "/"})
+                    headers.append("set-cookie", morsel.output(header="").strip())
+            await send(message)
+
+        await self.app(scope, receive, send_with_cookie)
+
+
+def _sets_csrf_cookie(headers: MutableHeaders) -> bool:
+    # An auth view's form already set it (with the same token).
+    return any(value.startswith(f"{CSRF_COOKIE_NAME}=") for value in headers.getlist("set-cookie"))
 
 
 class CsrfProtected:
