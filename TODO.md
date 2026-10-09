@@ -66,6 +66,17 @@ Shipped ahead of it: core-validated JSON filters (`validated_filter_json`, v0.12
     - an admin-only `AuditViews` page (filter by actor, action, date), permission-gated like `RoleAdminViews`.
   - **Done when:** each auth view's event lands in the store with actor, action, target and time, and the page
     lists them.
+- [ ] 3. `feat(testing): HTTP test fixtures`
+  - **Why:** PyFinBot's `tests/conftest.py` hand-rolls what every service on this package needs. This package's own
+    tests repeat the HX-Trigger parsing. Core's `greentechhub_core.testing.sqlalchemy` (greentechhub-core#70)
+    covers the database half.
+  - **Scope:**
+    - a `[testing]` extra and an opt-in plugin on top of core's;
+    - a client fixture with the session dependency and `Database` pointed at the test connection;
+    - auth re-registered after `dependency_overrides.clear()`;
+    - `post_login` (the CSRF double-submit), `web_login` (re-setting the Secure session cookie over http),
+      `hx_triggers`, and `client_as(persona)`.
+  - **Done when:** PyFinBot's `conftest.py` is its own fixtures only.
 
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
