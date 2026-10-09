@@ -159,4 +159,10 @@ class PasswordResetViews(EmailedLinkViews):
         await self.set_password(subject, password)
         if self._throttle is not None:
             await self._throttle.record_success(account_key(subject))
+        # Imported here: audit imports auth.dependency (through permissions),
+        # whose package __init__ imports this module.
+        from greentechhub_fastapi.audit import audit
+
+        await audit(request, "auth.password_reset", actor=subject, target=("user", subject),
+                    summary="Password reset by email link")
         return self._reset(request, token, done=True)

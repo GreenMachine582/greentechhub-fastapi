@@ -55,17 +55,6 @@ Shipped ahead of it: core-validated JSON filters (`validated_filter_json`, v0.12
     `constant_time_compare`.
   - **Done when:** a signed-in page's htmx POST without the header is refused, with it succeeds, and logout works
     from the navbar.
-- [ ] 2. `feat(audit): register_audit`
-  - **Why:** core ships an `AuditStore` (v0.10) with nothing writing to it. Services want "who signed in, who
-    changed a role, when did the last sync run", and ui plans a `gth_timeline` to show it.
-  - **Scope:**
-    - `register_audit(app, store)` puts the store on `app.state`;
-    - the views here record their own events: sign-in, failed sign-in, lockout, password change and reset, role
-      grant/revoke, settings changed;
-    - an `audit(request, action, ...)` helper for service events (e.g. PyFinBot's sync runs);
-    - an admin-only `AuditViews` page (filter by actor, action, date), permission-gated like `RoleAdminViews`.
-  - **Done when:** each auth view's event lands in the store with actor, action, target and time, and the page
-    lists them.
 - [ ] 3. `feat(testing): HTTP test fixtures`
   - **Why:** PyFinBot's `tests/conftest.py` hand-rolls what every service on this package needs. This package's own
     tests repeat the HX-Trigger parsing. Core's `greentechhub_core.testing.sqlalchemy` (greentechhub-core#70)
