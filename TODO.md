@@ -63,6 +63,21 @@ for each once it ships.
     - a token's scopes are permissions, capped by its owner's.
   - **Needs:** core's API token store (core TODO › API tokens).
   - **Done when:** a script authenticates with a personal token, and revoking it refuses the next call.
+- [ ] 4. `feat(errors): register_error_pages`
+  - **Why:** greentechhub-ui v0.17 ships `403.html`/`404.html`/`500.html`, but rendering them is a recipe each service
+    copies from ui's docs/components.md › Error pages. PyFinBot hasn't, so its pages show FastAPI's JSON errors.
+  - **Scope:**
+    - the recipe as a helper: browser page requests (accept HTML, not htmx, not under the API prefix) get the pages;
+      API and htmx requests keep the defaults;
+    - the 500 page carries `error_reference` from the request id, and its context stays failure-proof;
+    - opt-in, takes the service's `templates` and API prefix.
+  - **Done when:** PyFinBot's `/nope` renders ui's 404 page, and `/api/nope` still returns JSON.
+- [ ] 5. `feat(query): get_owned_or_404`
+  - **Why:** PyFinBot's stock and transaction routes each hand-roll "this row, or 404 when it's missing or not the
+    caller's" (`_get_stock_or_404`, `_get_transaction_or_404`); every per-user model needs it.
+  - **Scope:** `await get_owned_or_404(session, Model, id, owner=identity.subject, owner_field="user_id")`. Someone
+    else's row is a 404, not a 403, so ids don't leak.
+  - **Done when:** PyFinBot's two helpers are gone.
 
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
@@ -103,7 +118,8 @@ Its open items are under M3 above.
 ### PyFinBot
 It runs on this package throughout (auth, settings, permissions, roles, logging, health, API error handlers, query
 paging, login throttling). What's left is adopting the newer pieces, each a PR in PyFinBot's `todo.md`: the test
-fixtures, `register_audit`, CSRF on htmx forms and bearer API auth, then M6 above as it ships.
+fixtures, `register_audit`, CSRF on htmx forms and bearer API auth, then M6 above as it ships (its HTML error pages
+and `get_owned_or_404` included).
 
 ### Market Watch (planned)
 - [ ] Not started — builds on this from day one, same as PyFinBot
