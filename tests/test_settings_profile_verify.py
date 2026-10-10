@@ -2,7 +2,6 @@
 sent a confirmation link after the save, with the toast saying so; mail
 problems are logged and the profile is still saved."""
 
-import json
 import logging
 
 from fastapi.templating import Jinja2Templates
@@ -14,6 +13,7 @@ from jinja2 import DictLoader, Environment
 from greentechhub_fastapi import register_email, register_permissions, register_settings
 from greentechhub_fastapi.auth import EmailVerificationViews
 from greentechhub_fastapi.settings import SettingsViews
+from greentechhub_fastapi.testing import hx_triggers
 from tests.conftest import build_app
 from tests.test_settings import (  # noqa: F401
     ROLES,
@@ -60,7 +60,7 @@ def _save(app, display_name="Alice", email="alice@old.example"):
     response = _run(app, _post("/settings/profile",
                                {"display_name": display_name, "email": email}),
                     subject="alice")
-    toast = json.loads(response.headers["HX-Trigger"])["showToast"]["message"] \
+    toast = hx_triggers(response)["showToast"]["message"] \
         if response.status_code == 200 else None
     return response, toast
 

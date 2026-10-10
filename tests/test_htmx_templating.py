@@ -1,5 +1,4 @@
 import asyncio
-import json
 from pathlib import Path
 
 import httpx
@@ -9,6 +8,7 @@ from jinja2 import DictLoader
 
 from greentechhub_fastapi.htmx import hx_response
 from greentechhub_fastapi.templating import mount_static_dirs, ui_context
+from greentechhub_fastapi.testing import hx_triggers
 
 
 async def _get(app, path):
@@ -20,13 +20,13 @@ async def _get(app, path):
 def test_hx_response_is_a_bodyless_204_with_the_trigger():
     resp = hx_response('{"showToast": {"message": "Saved", "kind": "success"}}')
     assert resp.status_code == 204 and resp.body == b""
-    assert json.loads(resp.headers["HX-Trigger"])["showToast"]["message"] == "Saved"
+    assert hx_triggers(resp)["showToast"]["message"] == "Saved"
 
 
 def test_hx_response_json_encodes_a_mapping_and_can_carry_content():
     resp = hx_response({"closeModal": True, "rowsChanged": {"id": 7}},
                        status_code=200, content="<tr></tr>", headers={"X-Extra": "1"})
-    assert json.loads(resp.headers["HX-Trigger"]) == {"closeModal": True, "rowsChanged": {"id": 7}}
+    assert hx_triggers(resp) == {"closeModal": True, "rowsChanged": {"id": 7}}
     assert resp.status_code == 200 and resp.body == b"<tr></tr>"
     assert resp.headers["X-Extra"] == "1" and resp.headers["content-type"].startswith("text/html")
 

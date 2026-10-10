@@ -46,6 +46,10 @@ class Settings(GTHBaseSettings):
 
 `greentechhub-core` is still imported directly for pure contracts (`Settings`, `Page`, `ApplicationError`) — only the framework-touching pieces route through this package.
 
+**CSRF.** `register_csrf(app)` gives every request a CSRF token for greentechhub-ui's app shell to send on htmx
+requests. `require_csrf` and the views' `csrf=True` / `logout_csrf` opt-ins then check it. See
+"CSRF on htmx forms" in [docs/auth.md](auth.md).
+
 ## Permissions
 
 `register_permissions` is opt-in: nothing checks permissions until a service calls it and puts a `require_*`
@@ -372,6 +376,48 @@ redirected there (303) instead; anything else is ignored, so it's never an open 
 `unread_only`, `page_url` and `mark_all_url`. Each notification is a dict of its fields (`id`, `message`, `kind`,
 `title`, `icon`, `action_label`, `action_url`, `category`, `created_at`, `read_at`) plus `read`, `read_url` and
 `toast` (its `toast()` detail). The badge gets `count` and should render nothing for 0.
+
+## Audit log
+
+`register_audit(app, settings, store=..., views=...)` puts greentechhub-core's `AuditStore` on the app. From then on
+this package's views record what they do, and `audit()` records a service's own events:
+
+```python
+from greentechhub_core.sqlalchemy import SQLAlchemyAuditStore, audit_log_table
+from greentechhub_fastapi import register_audit
+from greentechhub_fastapi.audit import AuditViews, audit
+
+store = SQLAlchemyAuditStore(audit_log_table(metadata), async_session_factory=db.session_factory)
+register_audit(app, settings, store=store,
+               views=AuditViews(templates=templates, permission="audit.view"))
+
+# in a route: the signed-in user is the actor
+await audit(request, "stock.archived", target=("stock", stock.id), summary=f"Archived {stock.code}")
+```
+
+- `audit(request, action, *, actor=..., target=None, summary="", details=None)` takes a dotted lowercase action
+  (`"stock.archived"`) and returns the entry. The actor defaults to the signed-in user's subject; pass `actor=None`
+  for the system (a scheduled sync). Core scrubs credential-like keys out of `details`. Before `register_audit` it
+  does nothing and returns `None`. A store that fails is logged and `None` returned, never raised: the action has
+  already happened.
+- **Recorded by this package:**
+  - `auth.signed_in`, `auth.sign_in_failed` and `auth.locked_out` (`LoginViews`). `locked_out` is both the failure
+    that trips the throttle and each attempt refused while it holds. A failed attempt's details hold the user ID
+    typed, never the password.
+  - `auth.password_changed` (`SettingsViews`) and `auth.password_reset` (`PasswordResetViews`).
+  - `roles.granted` and `roles.revoked` (`RoleAdminViews`), one per role, with `details={"role": ...}`.
+  - `settings.changed` (`SettingsViews`): the section and the keys whose value changed, never the values. A secret
+    counts as changed whenever it's set or cleared.
+- Entries pile up: call `store.prune(before)` now and then.
+
+| Route | Does |
+|---|---|
+| `GET /admin/audit` | newest first, `page_size` (50) at a time. Filters: `actor`, `action` (exact, or a prefix ending in `.`), `on_or_before` (a date). `before` is the paging cursor. Anonymous → login redirect, without `permission` → 403 |
+
+**Templates.** It defaults to greentechhub-ui's `audit_page.html`; set `page_template` to use your own. It gets
+`page_title`, `audit_url`, `audit_filters` (`actor`, `action`, `on_or_before`), `audit_entries` (each `at`, `actor`,
+`action`, `target` as `"type:id"` or `None`, `summary`, `details`) and `audit_next_url` (the older page, keeping the
+filters, or `None`). An unreadable date or cursor is ignored, not refused.
 
 ## Email
 

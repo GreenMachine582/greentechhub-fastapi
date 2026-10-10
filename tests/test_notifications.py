@@ -3,7 +3,6 @@ person from a toast payload (honouring delivery preferences), and the
 signed-in user's page, panel, badge and mark-read actions."""
 
 import asyncio
-import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -24,6 +23,7 @@ from greentechhub_fastapi.notifications import (
     notify,
 )
 from greentechhub_fastapi.settings import get_settings_config
+from greentechhub_fastapi.testing import hx_triggers
 from tests.conftest import build_app
 from tests.test_settings import _get, _post, _run, role_settings  # noqa: F401
 
@@ -143,7 +143,7 @@ def test_marking_one_read_fires_the_event_with_the_new_count(role_settings, temp
     _seed(store, "alice", "Two", 2)
     response = _run(app, _post(f"/notifications/{first.id}/read", {}), subject="alice")
     assert response.status_code == 204
-    assert json.loads(response.headers["HX-Trigger"]) == {NOTIFICATIONS_EVENT: {"unread": 1}}
+    assert hx_triggers(response) == {NOTIFICATIONS_EVENT: {"unread": 1}}
 
 
 def test_nobody_can_mark_someone_elses_notification(role_settings, templates):  # noqa: F811
@@ -159,7 +159,7 @@ def test_mark_all_read(role_settings, templates):  # noqa: F811
     _seed(store, "alice", "Two", 2)
     _seed(store, "bob", "Bob's", 3)
     response = _run(app, _post("/notifications/read-all", {}), subject="alice")
-    assert json.loads(response.headers["HX-Trigger"]) == {NOTIFICATIONS_EVENT: {"unread": 0}}
+    assert hx_triggers(response) == {NOTIFICATIONS_EVENT: {"unread": 0}}
     assert store.unread_count_sync("alice") == 0 and store.unread_count_sync("bob") == 1
 
 

@@ -2,7 +2,6 @@
 hooks, field checks before save_profile, 422 with errors or 200 with a
 toast, and the display name reaching templates as user_display_name."""
 
-import json
 from html import unescape
 
 import pytest
@@ -11,6 +10,7 @@ from greentechhub_core.settings import InMemorySettingsStore
 
 from greentechhub_fastapi import register_permissions, register_settings
 from greentechhub_fastapi.settings import Profile, ProfileError, SettingsViews
+from greentechhub_fastapi.testing import hx_triggers
 from tests.conftest import build_app
 from tests.test_settings import (  # noqa: F401
     ROLES,
@@ -87,7 +87,7 @@ def test_saving_stores_the_stripped_profile_and_toasts(role_settings, templates)
     response = _run(_app(role_settings, templates, profiles), _post("/settings/profile", GOOD),
                     subject="alice")
     assert response.status_code == 200
-    assert json.loads(response.headers["HX-Trigger"])["showToast"]["message"] == "Profile saved"
+    assert hx_triggers(response)["showToast"]["message"] == "Profile saved"
     assert profiles.store["alice"] == Profile(display_name="Alice Smith", email="alice@example.com")
     assert "VAL display_name=Alice Smith" in response.text and "ERR" not in response.text
 

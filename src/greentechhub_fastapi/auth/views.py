@@ -49,7 +49,7 @@ from greentechhub_core.identity import DevelopmentIdentityProvider, Identity
 from greentechhub_core.security import LoginThrottle
 
 from greentechhub_fastapi.auth.cookies import clear_session_cookie, create_session_cookie
-from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected
+from greentechhub_fastapi.auth.csrf import CSRF_REFUSED, CsrfProtected, require_csrf
 from greentechhub_fastapi.auth.throttle import LoginLockedOut, client_address, throttled_login
 
 
@@ -81,6 +81,12 @@ class LoginViews(CsrfProtected, ABC):
     #: failed login (the user ID is kept so it needn't be retyped; the
     #: password never is). Set your own template name to keep a custom page.
     login_template: str = "login_page.html"
+
+    #: Check a CSRF token on POST /logout too (opt-in, v0.16): the navbar's
+    #: logout form carries one from greentechhub-ui's app shell once
+    #: register_csrf runs. Without it, a page on another site could sign
+    #: someone out. 403 when it's missing or wrong.
+    logout_csrf: bool = False
 
     #: Where a successful login redirects to — or, when the service registered
     #: core's landing_page_setting, the fallback if it can't be resolved.
@@ -178,34 +184,45 @@ class LoginViews(CsrfProtected, ABC):
         password: str = Form(...),
         csrf_token: str = Form(""),
     ):
+        # Imported here: greentechhub_fastapi.settings (and audit, through
+        # permissions) import auth.dependency, whose package __init__ imports
+        # this module.
+        from greentechhub_fastapi.audit import audit
+        from greentechhub_fastapi.settings import landing_url
+
         if self._csrf_refused(request, csrf_token):
             return await self._render(request, 403, error=CSRF_REFUSED, user_id=user_id)
+        attempted = {"user_id": user_id}
         try:
             identity = await throttled_login(
                 self._throttle, user_id, lambda: self.authenticate(user_id, password),
                 address=self.client_address(request),
             )
         except LoginLockedOut as locked:
+            await audit(request, "auth.locked_out", actor=None, details=attempted,
+                        summary=f"Sign-in locked out for {user_id}")
             return await self._render(request, 429, locked.headers, error=locked.detail,
                                       user_id=user_id)
         if identity is None:
+            await audit(request, "auth.sign_in_failed", actor=None, details=attempted,
+                        summary=f"Failed sign-in as {user_id}")
             return await self._render(request, 401, error="Incorrect user ID or password",
                                       user_id=user_id)
-
-        # Imported here: greentechhub_fastapi.settings imports auth.dependency,
-        # whose package __init__ imports this module.
-        from greentechhub_fastapi.settings import landing_url
 
         if (refusal := await self.refuse_sign_in(identity)) is not None:
             extra = {"verify_resend_url": self.verify_resend_url} if self.verify_resend_url else {}
             return await self._render(request, 403, error=refusal, user_id=user_id, **extra)
+        await audit(request, "auth.signed_in", actor=identity.subject,
+                    target=("user", identity.subject), summary=f"{user_id} signed in")
         token = self._identity_provider.issue(identity)
         url = await landing_url(request, identity, fallback=self.redirect_url)
         response = RedirectResponse(url=url, status_code=303)
         create_session_cookie(response, token)
         return response
 
-    async def _logout(self):
+    async def _logout(self, request: Request):
+        if self.logout_csrf:
+            await require_csrf(request)
         response = RedirectResponse(url=self.login_url, status_code=303)
         clear_session_cookie(response)
         return response
