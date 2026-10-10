@@ -178,27 +178,36 @@ class LoginViews(CsrfProtected, ABC):
         password: str = Form(...),
         csrf_token: str = Form(""),
     ):
+        # Imported here: greentechhub_fastapi.settings (and audit, through
+        # permissions) import auth.dependency, whose package __init__ imports
+        # this module.
+        from greentechhub_fastapi.audit import audit
+        from greentechhub_fastapi.settings import landing_url
+
         if self._csrf_refused(request, csrf_token):
             return await self._render(request, 403, error=CSRF_REFUSED, user_id=user_id)
+        attempted = {"user_id": user_id}
         try:
             identity = await throttled_login(
                 self._throttle, user_id, lambda: self.authenticate(user_id, password),
                 address=self.client_address(request),
             )
         except LoginLockedOut as locked:
+            await audit(request, "auth.locked_out", actor=None, details=attempted,
+                        summary=f"Sign-in locked out for {user_id}")
             return await self._render(request, 429, locked.headers, error=locked.detail,
                                       user_id=user_id)
         if identity is None:
+            await audit(request, "auth.sign_in_failed", actor=None, details=attempted,
+                        summary=f"Failed sign-in as {user_id}")
             return await self._render(request, 401, error="Incorrect user ID or password",
                                       user_id=user_id)
-
-        # Imported here: greentechhub_fastapi.settings imports auth.dependency,
-        # whose package __init__ imports this module.
-        from greentechhub_fastapi.settings import landing_url
 
         if (refusal := await self.refuse_sign_in(identity)) is not None:
             extra = {"verify_resend_url": self.verify_resend_url} if self.verify_resend_url else {}
             return await self._render(request, 403, error=refusal, user_id=user_id, **extra)
+        await audit(request, "auth.signed_in", actor=identity.subject,
+                    target=("user", identity.subject), summary=f"{user_id} signed in")
         token = self._identity_provider.issue(identity)
         url = await landing_url(request, identity, fallback=self.redirect_url)
         response = RedirectResponse(url=url, status_code=303)

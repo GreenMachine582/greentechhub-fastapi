@@ -48,10 +48,14 @@ greentechhub_fastapi.notifications.
 
 register_email likewise; send_email, get_email_sender and recipient_address
 live in greentechhub_fastapi.email.
+
+register_audit likewise; audit, get_audit_store and AuditViews live in
+greentechhub_fastapi.audit.
 """
 
 from greentechhub_fastapi.exceptions import register_api_error_handlers, register_exception_handlers
 from greentechhub_fastapi.registration import (
+    register_audit,
     register_auth,
     register_core,
     register_email,
@@ -66,6 +70,7 @@ from greentechhub_fastapi.registration import (
 
 __all__ = [
     "register_api_error_handlers",
+    "register_audit",
     "register_auth",
     "register_core",
     "register_email",
