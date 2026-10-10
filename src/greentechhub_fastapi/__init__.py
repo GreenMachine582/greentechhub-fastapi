@@ -49,6 +49,9 @@ greentechhub_fastapi.notifications.
 register_email likewise; send_email, get_email_sender and recipient_address
 live in greentechhub_fastapi.email.
 
+register_csrf likewise; require_csrf and CsrfMiddleware live in
+greentechhub_fastapi.auth.csrf.
+
 register_audit likewise; audit, get_audit_store and AuditViews live in
 greentechhub_fastapi.audit.
 """
@@ -58,6 +61,7 @@ from greentechhub_fastapi.registration import (
     register_audit,
     register_auth,
     register_core,
+    register_csrf,
     register_email,
     register_events,
     register_flash,
@@ -73,6 +77,7 @@ __all__ = [
     "register_audit",
     "register_auth",
     "register_core",
+    "register_csrf",
     "register_email",
     "register_events",
     "register_exception_handlers",

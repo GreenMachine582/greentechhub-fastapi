@@ -124,6 +124,9 @@ class RoleAdminViews:
     DELETE {url}/{subject}: remove all of them. Each write returns the
     section (422 with errors for a blank subject or no roles) and a toast.
 
+    `csrf=True` checks every write with require_csrf (403 without the
+    token); it needs register_csrf so the page carries one.
+
     Only grants are listed and edited: roles from directory groups or
     ROLE_BOOTSTRAP are configuration. That's also the recovery path if an
     admin removes their own grant. Stored role names that aren't in the
@@ -143,14 +146,19 @@ class RoleAdminViews:
         permission: str,
         roles: Iterable[Role] | None = None,
         grants: GrantStore | None = None,
+        csrf: bool = False,
     ) -> None:
         self._templates = templates
         self._guard = require_page_permission(permission, self.login_url)
+        self.csrf = csrf
         self._roles = tuple(roles) if roles is not None else None
         self._grants = grants
 
     def router(self) -> APIRouter:
-        router = APIRouter()
+        # Imported here: auth's package __init__ imports views, which import this module.
+        from greentechhub_fastapi.auth.csrf import require_csrf
+
+        router = APIRouter(dependencies=[Depends(require_csrf)] if self.csrf else [])
         guard = self._guard
 
         async def page(request: Request, user: Identity = Depends(guard)):

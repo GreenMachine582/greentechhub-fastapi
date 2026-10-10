@@ -65,6 +65,7 @@ from greentechhub_core.settings.builtins import (
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from greentechhub_fastapi.audit import audit
+from greentechhub_fastapi.auth.csrf import require_csrf
 from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.auth.errors import FormErrors
 from greentechhub_fastapi.dependencies.identity import require_page_identity
@@ -339,6 +340,11 @@ class SettingsViews:
     confirmed is the service's: save_profile should mark it unconfirmed when
     it changes, and mark_verified confirms it.
 
+    CSRF (opt-in): `csrf=True` checks every POST with require_csrf (the
+    X-CSRF-Token header greentechhub-ui's app shell sends on htmx requests,
+    or a csrf_token field), answering 403 without it. Needs register_csrf so
+    pages carry the token.
+
     Templates default to greentechhub-ui's ready-made settings_page.html and
     settings_section.html; override the names to use your own.
     """
@@ -367,6 +373,7 @@ class SettingsViews:
         load_profile: Callable[[Identity], Awaitable[Profile]] | None = None,
         save_profile: Callable[[Identity, Profile], Awaitable[None]] | None = None,
         verification: "EmailVerificationViews | None" = None,
+        csrf: bool = False,
     ) -> None:
         if (load_profile is None) != (save_profile is None):
             raise ValueError("pass load_profile and save_profile together")
@@ -375,10 +382,11 @@ class SettingsViews:
         self.load_profile = load_profile
         self._save_profile = save_profile
         self._verification = verification
+        self.csrf = csrf
         self._page_identity = require_page_identity(self.login_url)
 
     def router(self) -> APIRouter:
-        router = APIRouter()
+        router = APIRouter(dependencies=[Depends(require_csrf)] if self.csrf else [])
         page_identity = self._page_identity
 
         async def page(request: Request, user: Identity = Depends(page_identity)):

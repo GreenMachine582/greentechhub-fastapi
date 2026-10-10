@@ -17,6 +17,10 @@ from starlette.requests import Request
 from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp
 
+# CsrfMiddleware's request.state key (auth/csrf.py). A literal, not an import:
+# importing greentechhub_fastapi.auth here would pull in every auth view.
+CSRF_STATE = "gth_csrf_token"
+
 
 def ui_context(request: Request) -> dict[str, Any]:
     """A Jinja2Templates context processor supplying the per-request part of
@@ -24,8 +28,14 @@ def ui_context(request: Request) -> dict[str, Any]:
     what gth_sidebar / gth_navbar mark active and nav_breadcrumbs resolves.
     (gth-django's context processor supplies the same key.) Note Starlette
     applies context processors after the route's own context, so this value
-    wins over a route's current_path."""
-    return {"current_path": request.url.path}
+    wins over a route's current_path.
+
+    With register_csrf, also `csrf_token`: greentechhub-ui's app shell sends
+    it on every htmx request (hx-headers) and in the navbar's logout form."""
+    context: dict[str, Any] = {"current_path": request.url.path}
+    if token := getattr(request.state, CSRF_STATE, None):
+        context["csrf_token"] = token
+    return context
 
 
 def mount_static_dirs(app: ASGIApp, dirs: Mapping[str, str | PathLike[str]]) -> None:

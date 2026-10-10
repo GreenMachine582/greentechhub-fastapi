@@ -336,11 +336,42 @@ class MyLoginViews(LoginViews):
   the page with status 403 and "Your session expired. Please try again." (`error` on the sign-in page; `errors`
   under `__all__`, or under `identifier` on the forgot and resend forms), with a fresh token, and nothing else
   happens: no sign-in, no user created, no email sent, no reset link used up.
-- Not covered: `POST /logout` (signing someone out is low-risk, and the navbar's logout form has no token), the
-  emailed links (plain GETs), and your own htmx forms, which can send a token in `hx-headers` and check it
-  themselves.
+- The emailed links are plain GETs, so there's nothing to check.
 - Over plain HTTP the secure cookie isn't sent back, so every checked POST is refused. Leave `csrf` off for
   local HTTP testing, as the session cookie already needs HTTPS.
+
+**CSRF on htmx forms (opt-in, v0.16).** The state-changing requests a signed-in user makes all day (saving settings,
+editing roles, signing out, and a service's own htmx forms) use the same `gth_csrf` double-submit cookie:
+
+```python
+from greentechhub_fastapi import register_csrf
+from greentechhub_fastapi.auth.csrf import require_csrf
+
+register_csrf(app)  # every request gets a token; ui_context passes it to templates
+
+register_settings(app, settings, ..., views=SettingsViews(templates=templates, csrf=True))
+app.include_router(RoleAdminViews(templates=templates, permission="users.manage", csrf=True).router())
+
+class MyLoginViews(LoginViews):
+    csrf = True          # the sign-in form, as above
+    logout_csrf = True   # POST /logout too
+
+router = APIRouter(dependencies=[Depends(require_csrf)])  # your own htmx routes
+```
+
+- `register_csrf(app)` installs `CsrfMiddleware`. Each request gets a token: its well-formed `gth_csrf` cookie, else
+  a fresh one, set as the cookie on the response. The auth views' forms use the same token, so a page and its forms
+  always agree. With `ui_context` among the templates' context processors, templates get it as `csrf_token`.
+- greentechhub-ui's app shell (v0.17+) sends `csrf_token` on every htmx request as the `X-CSRF-Token` header
+  (`hx-headers` on `<body>`), and as a hidden field in the navbar's logout form. A plain form of your own adds
+  `gth_csrf_field(csrf_token)`.
+- `require_csrf` lets GET, HEAD and OPTIONS through. Any other method needs the cookie's token back as the
+  `X-CSRF-Token` header or the `csrf_token` form field, else 403 with "Your session expired. Please try again."
+- `SettingsViews(csrf=True)` checks every POST, including the theme toggle's save, which greentechhub-ui sends
+  through htmx with the page's headers. `RoleAdminViews(csrf=True)` checks assign, set and remove.
+  `LoginViews.logout_csrf = True` checks `POST /logout`. Without these, nothing changes.
+- JSON API routes don't need it. A bearer token isn't sent by the browser on its own, so another site can't ride
+  on it.
 
 ## Requiring a login on page routes
 
