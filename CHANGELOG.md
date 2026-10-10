@@ -5,6 +5,15 @@ version). From v0.8.0 on, entries are written by [release-please](https://github
 from conventional commits; the same notes are published as
 [GitHub Releases](https://github.com/GreenMachine582/greentechhub-fastapi/releases).
 
+## [0.16.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.15.1...v0.16.0) (2026-10-10)
+
+
+### Features
+
+* **audit:** register_audit ([#74](https://github.com/GreenMachine582/greentechhub-fastapi/issues/74)) ([2ebd6a4](https://github.com/GreenMachine582/greentechhub-fastapi/commit/2ebd6a45bfd0661b1127e8ffa7cce9d130cf6387))
+* **auth:** CSRF for htmx forms ([#75](https://github.com/GreenMachine582/greentechhub-fastapi/issues/75)) ([fc2eb95](https://github.com/GreenMachine582/greentechhub-fastapi/commit/fc2eb95bb8919b714676a24f44fe9cb8ef3227b9))
+* **testing:** HTTP test fixtures ([#73](https://github.com/GreenMachine582/greentechhub-fastapi/issues/73)) ([15a7a5c](https://github.com/GreenMachine582/greentechhub-fastapi/commit/15a7a5cb538b464cc0aa265ccb333bacc6e23635))
+
 ## [0.15.1](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.15.0...v0.15.1) (2026-10-09)
 
 
