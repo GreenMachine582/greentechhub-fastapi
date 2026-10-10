@@ -38,32 +38,6 @@ ui drops its CDN-URL defaults, so services must mount `greentechhub_ui.static_di
 - [ ] When it lands, check `mount_static_dirs` in docs/registration.md and the README example still match what ui
   requires, and that the playground mounts them.
 
-### M5 Display & data — next
-Shipped ahead of it: core-validated JSON filters (`validated_filter_json`, v0.12) for ui's planned query builder.
-
-- [ ] 2. `feat(audit): register_audit`
-  - **Why:** core ships an `AuditStore` (v0.10) with nothing writing to it. Services want "who signed in, who
-    changed a role, when did the last sync run", and ui plans a `gth_timeline` to show it.
-  - **Scope:**
-    - `register_audit(app, store)` puts the store on `app.state`;
-    - the views here record their own events: sign-in, failed sign-in, lockout, password change and reset, role
-      grant/revoke, settings changed;
-    - an `audit(request, action, ...)` helper for service events (e.g. PyFinBot's sync runs);
-    - an admin-only `AuditViews` page (filter by actor, action, date), permission-gated like `RoleAdminViews`.
-  - **Done when:** each auth view's event lands in the store with actor, action, target and time, and the page
-    lists them.
-- [ ] 3. `feat(testing): HTTP test fixtures`
-  - **Why:** PyFinBot's `tests/conftest.py` hand-rolls what every service on this package needs. This package's own
-    tests repeat the HX-Trigger parsing. Core's `greentechhub_core.testing.sqlalchemy` (greentechhub-core#70)
-    covers the database half.
-  - **Scope:**
-    - a `[testing]` extra and an opt-in plugin on top of core's;
-    - a client fixture with the session dependency and `Database` pointed at the test connection;
-    - auth re-registered after `dependency_overrides.clear()`;
-    - `post_login` (the CSRF double-submit), `web_login` (re-setting the Secure session cookie over http),
-      `hx_triggers`, and `client_as(persona)`.
-  - **Done when:** PyFinBot's `conftest.py` is its own fixtures only.
-
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
 one `register_*` call. Who wants it is noted where known.

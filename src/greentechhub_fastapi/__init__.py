@@ -51,10 +51,14 @@ live in greentechhub_fastapi.email.
 
 register_csrf likewise; require_csrf and CsrfMiddleware live in
 greentechhub_fastapi.auth.csrf.
+
+register_audit likewise; audit, get_audit_store and AuditViews live in
+greentechhub_fastapi.audit.
 """
 
 from greentechhub_fastapi.exceptions import register_api_error_handlers, register_exception_handlers
 from greentechhub_fastapi.registration import (
+    register_audit,
     register_auth,
     register_core,
     register_csrf,
@@ -70,6 +74,7 @@ from greentechhub_fastapi.registration import (
 
 __all__ = [
     "register_api_error_handlers",
+    "register_audit",
     "register_auth",
     "register_core",
     "register_csrf",

@@ -1,5 +1,4 @@
 import asyncio
-import json
 
 import httpx
 import pytest
@@ -11,6 +10,7 @@ from greentechhub_core.permissions import InMemoryGrantStore, Permission, Role
 
 from greentechhub_fastapi import register_permissions
 from greentechhub_fastapi.permissions import RoleAdminViews
+from greentechhub_fastapi.testing import hx_triggers
 from tests.conftest import build_app
 
 MANAGE = Permission("users.manage")
@@ -78,7 +78,7 @@ def _run(app, flow, subject=None):
 
 
 def _trigger(response) -> str:
-    return json.loads(response.headers["HX-Trigger"])["showToast"]["message"]
+    return hx_triggers(response)["showToast"]["message"]
 
 
 # ── the permission gate ────────────────────────────────────────────────────

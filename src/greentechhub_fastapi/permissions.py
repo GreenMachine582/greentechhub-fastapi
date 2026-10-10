@@ -226,6 +226,15 @@ class RoleAdminViews:
 
     # writes
 
+    @staticmethod
+    async def _audit(request: Request, action: str, subject: str, role: str) -> None:
+        # Imported here: audit imports this module.
+        from greentechhub_fastapi.audit import audit
+
+        verb = "Granted" if action == "roles.granted" else "Revoked"
+        await audit(request, action, target=("user", subject), details={"role": role},
+                    summary=f"{verb} {role} {'to' if verb == 'Granted' else 'from'} {subject}")
+
     async def _assign(self, request: Request):
         form = await request.form()
         subject = str(form.get("subject") or "").strip()
@@ -242,6 +251,7 @@ class RoleAdminViews:
         store = self._store(request)
         for role in roles:
             await store.assign(subject, role)
+            await self._audit(request, "roles.granted", subject, role)
         return await self._section(request, f"Roles assigned to {subject}")
 
     async def _set(self, request: Request, subject: str):
@@ -250,14 +260,17 @@ class RoleAdminViews:
         known = {r.name for r in self._catalogue(request)}
         store = self._store(request)
         held = await store.roles_for(subject)
-        for role in wanted - held:
+        for role in sorted(wanted - held):
             await store.assign(subject, role)
-        for role in (held & known) - wanted:  # unknown stored names are left alone
+            await self._audit(request, "roles.granted", subject, role)
+        for role in sorted((held & known) - wanted):  # unknown stored names are left alone
             await store.revoke(subject, role)
+            await self._audit(request, "roles.revoked", subject, role)
         return await self._section(request, f"Roles saved for {subject}")
 
     async def _remove(self, request: Request, subject: str):
         store = self._store(request)
-        for role in await store.roles_for(subject):
+        for role in sorted(await store.roles_for(subject)):
             await store.revoke(subject, role)
+            await self._audit(request, "roles.revoked", subject, role)
         return await self._section(request, f"Removed {subject}'s roles")

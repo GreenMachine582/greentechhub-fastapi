@@ -64,6 +64,7 @@ from greentechhub_core.settings.builtins import (
 )
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from greentechhub_fastapi.audit import audit
 from greentechhub_fastapi.auth.csrf import require_csrf
 from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.auth.errors import FormErrors
@@ -525,6 +526,14 @@ class SettingsViews:
         except SettingPermissionError:
             return Response(status_code=403)
         after = await settings.effective(user)
+        # Which keys changed, never their values: a secret's plaintext must
+        # not reach the log, and core scrubs credential-like keys besides.
+        changed = sorted({k for k in submitted if after.get(k) != before.get(k)} | set(secrets))
+        if changed:
+            target = ("settings", "app") if section == "app" else ("user", user.subject)
+            await audit(request, "settings.changed", actor=user.subject, target=target,
+                        summary=f"Changed {', '.join(changed)}",
+                        details={"section": section, "keys": changed})
         events = {}
         if THEME_KEY in submitted and after.get(THEME_KEY) != before.get(THEME_KEY):
             events["gth:theme"] = after[THEME_KEY]
@@ -664,6 +673,8 @@ class SettingsViews:
             errors["current_password"] = ["That isn't your current password."]
         if errors:
             return self._render_section(request, self._password_section(errors), status_code=422)
+        await audit(request, "auth.password_changed", actor=user.subject,
+                    target=("user", user.subject), summary="Password changed")
         return self._render_section(
             request, self._password_section(),
             headers={"HX-Trigger": _toast_trigger("Password changed", {})},
