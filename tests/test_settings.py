@@ -1,5 +1,4 @@
 import asyncio
-import json
 
 import httpx
 import pytest
@@ -24,6 +23,7 @@ from greentechhub_fastapi.settings import (
     get_effective_settings,
     settings_context,
 )
+from greentechhub_fastapi.testing import hx_triggers
 from tests.conftest import build_app
 
 MANAGE = Permission("settings.manage")
@@ -200,7 +200,7 @@ def test_preferences_save_stores_and_sends_the_theme_event(role_settings, templa
     response = _run(app, _post("/settings/preferences",
                                {"ui.theme": "light", "ui.page_size": "50"}), subject="alice")
     assert response.status_code == 200
-    trigger = json.loads(response.headers["HX-Trigger"])
+    trigger = hx_triggers(response)
     assert trigger["showToast"]["message"] == "Preferences saved"
     assert trigger["gth:theme"] == "light"
     assert "VAL ui.page_size=50" in response.text
@@ -219,7 +219,7 @@ def test_saving_the_defaults_stores_nothing(role_settings, templates):
                                  data={"ui.theme": "system", "ui.page_size": "25"}, headers=HTML)
 
     response = _run(app, flow, subject="alice")
-    assert json.loads(response.headers["HX-Trigger"])["gth:theme"] == "system"
+    assert hx_triggers(response)["gth:theme"] == "system"
     assert asyncio.run(store.get_many(SettingScope.USER, "alice")) == {}
 
 
@@ -227,7 +227,7 @@ def test_no_theme_event_when_the_theme_is_unchanged(role_settings, templates):
     response = _run(_app(role_settings, templates),
                     _post("/settings/preferences", {"ui.theme": "system", "ui.page_size": "30"}),
                     subject="alice")
-    assert "gth:theme" not in json.loads(response.headers["HX-Trigger"])
+    assert "gth:theme" not in hx_triggers(response)
 
 
 def test_invalid_preference_is_a_422_and_nothing_is_stored(role_settings, templates):
@@ -250,7 +250,7 @@ def test_app_save_needs_the_permission(role_settings, templates):
     allowed = _run(app, _post("/settings/app", {"site.banner": "Down at 5",
                                                 "site.maintenance": "true"}), subject="root")
     assert allowed.status_code == 200
-    assert json.loads(allowed.headers["HX-Trigger"])["showToast"]["message"] == "App saved"
+    assert hx_triggers(allowed)["showToast"]["message"] == "App saved"
     assert asyncio.run(store.get_many(SettingScope.APP, None)) == {
         "site.banner": "Down at 5", "site.maintenance": True}
 

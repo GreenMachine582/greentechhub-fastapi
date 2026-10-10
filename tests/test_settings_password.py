@@ -2,7 +2,6 @@
 `change_password=`, field checks before the callable, 422 with errors or
 200 with a toast, and passwords never rendered back."""
 
-import json
 from html import unescape
 
 from fastapi import FastAPI
@@ -10,6 +9,7 @@ from greentechhub_core.settings import InMemorySettingsStore
 
 from greentechhub_fastapi import register_permissions, register_settings
 from greentechhub_fastapi.settings import SettingsViews
+from greentechhub_fastapi.testing import hx_triggers
 from tests.conftest import build_app
 from tests.test_settings import (  # noqa: F401
     ROLES,
@@ -65,7 +65,7 @@ def test_a_valid_change_stores_the_new_password_and_toasts(role_settings, templa
     response = _run(_app(role_settings, templates, passwords), _post("/settings/password", GOOD),
                     subject="alice")
     assert response.status_code == 200
-    assert json.loads(response.headers["HX-Trigger"])["showToast"]["message"] == "Password changed"
+    assert hx_triggers(response)["showToast"]["message"] == "Password changed"
     assert passwords.store["alice"] == "new-secret-1"
     assert response.text.startswith("SECTION password") and "ERR" not in response.text
     assert "secret" not in response.text  # neither password comes back
