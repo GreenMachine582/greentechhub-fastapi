@@ -78,6 +78,18 @@ for each once it ships.
   - **Scope:** `await get_owned_or_404(session, Model, id, owner=identity.subject, owner_field="user_id")`. Someone
     else's row is a 404, not a 403, so ids don't leak.
   - **Done when:** PyFinBot's two helpers are gone.
+- [ ] 6. `feat(auth): CSRF for cookie-authenticated API calls`
+  - **Why:** with `register_auth(bearer=True)`, an API request without an `Authorization` header falls back to the
+    session cookie, so a browser's cookie works on PyFinBot's `/api` too. `require_csrf` can't sit on the API
+    router, because bearer clients (scripts) would then need a CSRF token. The cookie's `SameSite=Lax` already keeps
+    other sites' POSTs from carrying it, so this is defence in depth.
+  - **Scope:**
+    - a dependency (or a `require_csrf` option) that checks the token only when the request was authenticated by
+      the session cookie, never when it carried a bearer header;
+    - safe methods pass, as with `require_csrf`;
+    - opt-in for an API router (`dependencies=[...]`).
+  - **Done when:** PyFinBot's `/api` refuses a cookie-authenticated POST without the token, while a bearer-token
+    POST needs none.
 
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
