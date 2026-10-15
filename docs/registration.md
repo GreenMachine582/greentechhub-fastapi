@@ -50,6 +50,11 @@ class Settings(GTHBaseSettings):
 requests. `require_csrf` and the views' `csrf=True` / `logout_csrf` opt-ins then check it. See
 "CSRF on htmx forms" in [docs/auth.md](auth.md).
 
+**Personal API tokens.** `register_api_tokens(app, settings, store=...)` puts greentechhub-core's
+`ApiTokenStore` on the app. With `register_auth(..., bearer=True)`, a script's personal token then signs its owner
+in, capped to the token's scopes. `SettingsViews(api_tokens=ApiTokenViews(...))` adds the section that creates,
+lists and revokes them. See "Personal API tokens" in [docs/auth.md](auth.md).
+
 **CSP.** `register_csp(app)` sends a `Content-Security-Policy` header with a fresh nonce per request. The default
 is greentechhub-ui's recommended policy (its `docs/contract.md` › Content-Security-Policy). `ui_context` hands the
 nonce to templates as `csp_nonce`, and ui's `app.html` puts it on every `<script>`:

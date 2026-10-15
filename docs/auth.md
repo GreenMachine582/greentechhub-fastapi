@@ -157,7 +157,48 @@ async def things(identity: Identity = Depends(require_permission("things.view"))
 - `bearer_scheme(token_url)` only documents the scheme in OpenAPI (`auto_error=False`), so Swagger's Authorize
   button works. The checking is done by `get_current_identity` / `require_permission`.
 - An API token and a session cookie are the same kind of JWT, so either works in either place. Both are stateless,
-  so a stolen one is valid until it expires.
+  so a stolen one is valid until it expires. For scripts, prefer personal API tokens (below), which can be revoked.
+
+**Personal API tokens (local adapter).** A person creates these in Settings for their own scripts. Each one is
+stored only as a hash (greentechhub-core's `ApiTokenStore`), carries scopes, and stops working when it's revoked:
+
+```python
+from greentechhub_core.sqlalchemy import SQLAlchemyApiTokenStore, api_tokens_table
+from greentechhub_fastapi import register_api_tokens
+from greentechhub_fastapi.api_tokens import ApiTokenViews
+
+register_auth(app, settings, bearer=True)
+register_api_tokens(app, settings, store=SQLAlchemyApiTokenStore(
+    api_tokens_table(metadata), async_session_factory=db.session_factory))
+register_settings(app, settings, registry=registry, store=settings_store, views=SettingsViews(
+    templates=templates, api_tokens=ApiTokenViews(templates=templates)))
+```
+
+A script then sends `Authorization: Bearer <token>`:
+- **Telling the two apart:** a personal token is url-safe base64 with no dots, and a JWT has dots, so the local
+  adapter tells them apart by shape. A personal token signs in its owner.
+- **Scopes:** a token's scopes are permission strings, capped by its owner's.
+  - When it's created, it can only get permissions the owner holds. The section offers those, and any other scope
+    is a 422.
+  - On each request it holds only the owner's *current* permissions that are among its scopes, so
+    `require_permission` refuses anything else with a 403. A permission the owner loses, the token loses too.
+- **The "API tokens" section:** it sits on the settings page after Password and does three things:
+  - `POST /settings/api-tokens` creates a token from the fields `name`, `scopes` (repeated) and `expires_in_days`
+    (30, 90 or 365, or blank for never). It shows the token this once.
+  - It lists the person's tokens with their last use.
+  - `DELETE /settings/api-tokens/{id}` revokes one. Another person's token id is a 404.
+- **Who can manage tokens:** a request signed in with a personal token gets a 403 from both routes, so a token
+  can't mint more.
+- **Audit:** with `register_audit`, `api_token.created` and `api_token.revoked` are recorded. The token itself
+  never is.
+- **Limitations:**
+  - A token's identity has only its owner's subject, so its roles come from grants and `ROLE_BOOTSTRAP`, not
+    directory groups (`ROLE_GROUPS`).
+  - `forward_auth` doesn't resolve personal tokens.
+- **Templates:** the section renders greentechhub-ui's `api_tokens_section.html`, passing data only (see
+  `ApiTokenViews.section` for its context), and names that template in its `template` key for `settings_page.html`
+  to include. Both need a greentechhub-ui release that ships them. Until then, point `section_template` at a
+  template of your own.
 
 **Sign-up: `RegisterViews`** (`greentechhub_fastapi.auth.RegisterViews`) is the same idea for self-service sign-up:
 `GET`/`POST /register`, with only storing the new user left to fill in:
