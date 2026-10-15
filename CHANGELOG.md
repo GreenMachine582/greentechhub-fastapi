@@ -5,6 +5,22 @@ version). From v0.8.0 on, entries are written by [release-please](https://github
 from conventional commits; the same notes are published as
 [GitHub Releases](https://github.com/GreenMachine582/greentechhub-fastapi/releases).
 
+## [0.17.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.16.0...v0.17.0) (2026-10-15)
+
+
+### Features
+
+* **admin:** register_admin ([#83](https://github.com/GreenMachine582/greentechhub-fastapi/issues/83)) ([b172e1e](https://github.com/GreenMachine582/greentechhub-fastapi/commit/b172e1edad8da389d0cdfb53f1715d4a2e7d0b10))
+* **auth:** CSRF for cookie-authenticated API calls ([#87](https://github.com/GreenMachine582/greentechhub-fastapi/issues/87)) ([eacb146](https://github.com/GreenMachine582/greentechhub-fastapi/commit/eacb1463ac17623eb6c22340b077167977e70b41))
+* **auth:** personal API tokens ([#84](https://github.com/GreenMachine582/greentechhub-fastapi/issues/84)) ([1797a91](https://github.com/GreenMachine582/greentechhub-fastapi/commit/1797a91e93a3a27a62321ec974314cf9f9e58155))
+* **errors:** register_error_pages ([#85](https://github.com/GreenMachine582/greentechhub-fastapi/issues/85)) ([c4124dc](https://github.com/GreenMachine582/greentechhub-fastapi/commit/c4124dc542c685afd17e773bb865a7462de3aeb7))
+* **security:** register_csp ([#82](https://github.com/GreenMachine582/greentechhub-fastapi/issues/82)) ([3d21cfe](https://github.com/GreenMachine582/greentechhub-fastapi/commit/3d21cfeeb8448200d26f26abc2a3ea626d88a389))
+
+
+### Build
+
+* **deps:** core v0.15.0 ([#81](https://github.com/GreenMachine582/greentechhub-fastapi/issues/81)) ([773fadb](https://github.com/GreenMachine582/greentechhub-fastapi/commit/773fadb24c3e41cb170a77aacbf9c26b765303a7))
+
 ## [0.16.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.15.1...v0.16.0) (2026-10-10)
 
 
