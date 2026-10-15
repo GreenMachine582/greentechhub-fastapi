@@ -33,12 +33,6 @@ ui drops its CDN-URL defaults, so services must mount `greentechhub_ui.static_di
 What PyFinBot still needs from this package. One PR each, in this order; PyFinBot's `todo.md` holds the adoption PR
 for each once it ships.
 
-- [ ] 5. `feat(query): get_owned_or_404`
-  - **Why:** PyFinBot's stock and transaction routes each hand-roll "this row, or 404 when it's missing or not the
-    caller's" (`_get_stock_or_404`, `_get_transaction_or_404`); every per-user model needs it.
-  - **Scope:** `await get_owned_or_404(session, Model, id, owner=identity.subject, owner_field="user_id")`. Someone
-    else's row is a 404, not a 403, so ids don't leak.
-  - **Done when:** PyFinBot's two helpers are gone.
 - [ ] 6. `feat(auth): CSRF for cookie-authenticated API calls`
   - **Why:** with `register_auth(bearer=True)`, an API request without an `Authorization` header falls back to the
     session cookie, so a browser's cookie works on PyFinBot's `/api` too. `require_csrf` can't sit on the API
