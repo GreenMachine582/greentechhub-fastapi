@@ -149,4 +149,8 @@ txn = await get_owned_or_404(session, Transaction, txn_id, owner=identity.subjec
 - The 404 becomes `register_error_pages`' page (with the detail as its message), `register_api_error_handlers`'
   `not_found` envelope under the API prefix, or FastAPI's default.
 - `owner` with a model that has no `owner_field` raises `AttributeError`: that's a bug, not a missing row.
+- `options=` passes loader options to `session.get`, for a relationship the route reads:
+  `get_owned_or_404(session, Transaction, txn_id, owner=identity.subject, options=[selectinload(Transaction.stock)])`.
+  An `AsyncSession` can't lazy-load it afterwards (`MissingGreenlet`). As with `session.get`, the options apply when
+  the row is loaded, so a row the session already holds comes back as it is.
 
