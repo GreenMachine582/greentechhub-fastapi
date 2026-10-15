@@ -57,10 +57,14 @@ greentechhub_fastapi.auth.csrf.
 
 register_audit likewise; audit, get_audit_store and AuditViews live in
 greentechhub_fastapi.audit.
+
+register_admin likewise; admin_nav_item and AdminView live in
+greentechhub_fastapi.admin.
 """
 
 from greentechhub_fastapi.exceptions import register_api_error_handlers, register_exception_handlers
 from greentechhub_fastapi.registration import (
+    register_admin,
     register_audit,
     register_auth,
     register_core,
@@ -77,6 +81,7 @@ from greentechhub_fastapi.registration import (
 )
 
 __all__ = [
+    "register_admin",
     "register_api_error_handlers",
     "register_audit",
     "register_auth",

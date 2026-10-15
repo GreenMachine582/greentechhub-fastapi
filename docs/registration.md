@@ -437,6 +437,36 @@ await audit(request, "stock.archived", target=("stock", stock.id), summary=f"Arc
 `action`, `target` as `"type:id"` or `None`, `summary`, `details`) and `audit_next_url` (the older page, keeping the
 filters, or `None`). An unreadable date or cursor is ignored, not refused.
 
+
+## Admin
+
+`register_admin(app, settings, views=[...])` mounts a service's admin pages and returns their "Admin" nav group for
+greentechhub-ui:
+
+```python
+from greentechhub_fastapi import register_admin
+from greentechhub_fastapi.audit import AuditViews
+from greentechhub_fastapi.permissions import RoleAdminViews
+
+audit_views = AuditViews(templates=templates, permission="audit.view")
+register_audit(app, settings, store=store, views=audit_views)
+admin_nav = register_admin(app, settings, views=[
+    RoleAdminViews(templates=templates, permission="users.manage"),
+    audit_views,  # register_audit already mounted it, so it isn't mounted twice
+])
+greentechhub_ui.install(templates.env, service_name="…",
+                        nav_items=build_nav_items(custom_items=[..., admin_nav]))
+```
+
+- Each view is one child of the group: its `title`, `url` and `icon`, with its `permission` as
+  `required_permission`. `RoleAdminViews` is "Roles" (`shield-lock`) and `AuditViews` is "Audit log"
+  (`journal-text`). Override `title`/`url`/`icon` on a subclass like any view attribute.
+- ui's nav filtering hides the pages a viewer can't open. The group has no `url` of its own, so it disappears when
+  none are left: only people with at least one admin permission see "Admin".
+- A service's own admin page joins by having `url`, `title`, `icon`, `permission` and `router()`
+  (`greentechhub_fastapi.admin.AdminView`). `label=` and `icon=` rename the group. `admin_nav_item(views)` builds
+  the group without mounting anything.
+
 ## Email
 
 `register_email(app, settings, sender=..., address_for=None, base_url=None)` puts a greentechhub-core `EmailSender`

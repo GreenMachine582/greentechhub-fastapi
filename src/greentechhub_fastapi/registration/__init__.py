@@ -1,3 +1,4 @@
+from greentechhub_fastapi.registration.admin import register_admin
 from greentechhub_fastapi.registration.audit import register_audit
 from greentechhub_fastapi.registration.auth import register_auth
 from greentechhub_fastapi.registration.core import register_core
@@ -13,6 +14,7 @@ from greentechhub_fastapi.registration.permissions import register_permissions
 from greentechhub_fastapi.registration.settings import register_settings
 
 __all__ = [
+    "register_admin",
     "register_audit",
     "register_auth",
     "register_core",

@@ -119,10 +119,12 @@ class AuditViews:
     url: str = "/admin/audit"
     login_url: str = "/login"
     title: str = "Audit log"
+    icon: str = "journal-text"  # its entry in register_admin's nav group
     page_size: int = 50
 
     def __init__(self, *, templates: Jinja2Templates, permission: str) -> None:
         self._templates = templates
+        self.permission = permission
         self._guard = require_page_permission(permission, self.login_url)
 
     def router(self) -> APIRouter:
