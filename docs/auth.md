@@ -157,7 +157,48 @@ async def things(identity: Identity = Depends(require_permission("things.view"))
 - `bearer_scheme(token_url)` only documents the scheme in OpenAPI (`auto_error=False`), so Swagger's Authorize
   button works. The checking is done by `get_current_identity` / `require_permission`.
 - An API token and a session cookie are the same kind of JWT, so either works in either place. Both are stateless,
-  so a stolen one is valid until it expires.
+  so a stolen one is valid until it expires. For scripts, prefer personal API tokens (below), which can be revoked.
+
+**Personal API tokens (local adapter).** A person creates these in Settings for their own scripts. Each one is
+stored only as a hash (greentechhub-core's `ApiTokenStore`), carries scopes, and stops working when it's revoked:
+
+```python
+from greentechhub_core.sqlalchemy import SQLAlchemyApiTokenStore, api_tokens_table
+from greentechhub_fastapi import register_api_tokens
+from greentechhub_fastapi.api_tokens import ApiTokenViews
+
+register_auth(app, settings, bearer=True)
+register_api_tokens(app, settings, store=SQLAlchemyApiTokenStore(
+    api_tokens_table(metadata), async_session_factory=db.session_factory))
+register_settings(app, settings, registry=registry, store=settings_store, views=SettingsViews(
+    templates=templates, api_tokens=ApiTokenViews(templates=templates)))
+```
+
+A script then sends `Authorization: Bearer <token>`:
+- **Telling the two apart:** a personal token is url-safe base64 with no dots, and a JWT has dots, so the local
+  adapter tells them apart by shape. A personal token signs in its owner.
+- **Scopes:** a token's scopes are permission strings, capped by its owner's.
+  - When it's created, it can only get permissions the owner holds. The section offers those, and any other scope
+    is a 422.
+  - On each request it holds only the owner's *current* permissions that are among its scopes, so
+    `require_permission` refuses anything else with a 403. A permission the owner loses, the token loses too.
+- **The "API tokens" section:** it sits on the settings page after Password and does three things:
+  - `POST /settings/api-tokens` creates a token from the fields `name`, `scopes` (repeated) and `expires_in_days`
+    (30, 90 or 365, or blank for never). It shows the token this once.
+  - It lists the person's tokens with their last use.
+  - `DELETE /settings/api-tokens/{id}` revokes one. Another person's token id is a 404.
+- **Who can manage tokens:** a request signed in with a personal token gets a 403 from both routes, so a token
+  can't mint more.
+- **Audit:** with `register_audit`, `api_token.created` and `api_token.revoked` are recorded. The token itself
+  never is.
+- **Limitations:**
+  - A token's identity has only its owner's subject, so its roles come from grants and `ROLE_BOOTSTRAP`, not
+    directory groups (`ROLE_GROUPS`).
+  - `forward_auth` doesn't resolve personal tokens.
+- **Templates:** the section renders greentechhub-ui's `api_tokens_section.html`, passing data only (see
+  `ApiTokenViews.section` for its context), and names that template in its `template` key for `settings_page.html`
+  to include. Both need a greentechhub-ui release that ships them. Until then, point `section_template` at a
+  template of your own.
 
 **Sign-up: `RegisterViews`** (`greentechhub_fastapi.auth.RegisterViews`) is the same idea for self-service sign-up:
 `GET`/`POST /register`, with only storing the new user left to fill in:
@@ -370,8 +411,27 @@ router = APIRouter(dependencies=[Depends(require_csrf)])  # your own htmx routes
 - `SettingsViews(csrf=True)` checks every POST, including the theme toggle's save, which greentechhub-ui sends
   through htmx with the page's headers. `RoleAdminViews(csrf=True)` checks assign, set and remove.
   `LoginViews.logout_csrf = True` checks `POST /logout`. Without these, nothing changes.
-- JSON API routes don't need it. A bearer token isn't sent by the browser on its own, so another site can't ride
-  on it.
+- **JSON API routes** take `require_cookie_csrf` instead. With `register_auth(bearer=True)`, an API request
+  without an `Authorization` header falls back to the session cookie, so a browser's cookie works on `/api` too.
+  `require_csrf` there would make every script send a CSRF token:
+
+  ```python
+  from greentechhub_fastapi.auth.csrf import require_cookie_csrf
+
+  api = APIRouter(prefix="/api", dependencies=[Depends(require_cookie_csrf)])
+  ```
+
+  - A request the session cookie signs in is checked exactly as `require_csrf` checks it.
+  - A request with a bearer header the app resolves isn't checked: the header alone decides who it is, and a
+    browser never sends it on its own. Without `bearer=True`, the cookie is what signs the caller in, so a bearer
+    header doesn't skip the check.
+  - An anonymous request (no cookie, no bearer) has nothing for another site to ride on, so a script's
+    `POST /api/auth/login` still works.
+  - Browser code sends the token as `X-CSRF-Token`. greentechhub-ui's app shell already does on htmx requests. A
+    `fetch()` of your own sends the page's `csrf_token`.
+  - `forward_auth` isn't covered. There the session is the proxy's (Authentik's) cookie.
+  - The session cookie's `SameSite=Lax` already keeps other sites' POSTs from carrying it, so this is defence in
+    depth.
 
 ## Requiring a login on page routes
 

@@ -26,6 +26,8 @@ from greentechhub_core.identity import DevelopmentIdentityProvider, Identity
 
 #: Where register_auth keeps the local adapter's provider on app.state.
 IDENTITY_PROVIDER_STATE_KEY = "gth_identity_provider"
+#: app.state: whether register_auth resolves `Authorization: Bearer` (local, bearer=True).
+BEARER_AUTH_STATE_KEY = "gth_bearer_auth"
 
 
 def issue_token(

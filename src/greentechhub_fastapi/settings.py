@@ -72,9 +72,10 @@ from greentechhub_fastapi.dependencies.identity import require_page_identity
 from greentechhub_fastapi.email import EMAIL_SEND_ERRORS
 from greentechhub_fastapi.htmx import _toast_trigger
 from greentechhub_fastapi.notifications import NOTIFICATIONS_STATE_KEY
-from greentechhub_fastapi.permissions import _GRANTED_STATE_KEY, RESOLVER_STATE_KEY
+from greentechhub_fastapi.permissions import _GRANTED_STATE_KEY, RESOLVER_STATE_KEY, resolve_granted
 
 if TYPE_CHECKING:
+    from greentechhub_fastapi.api_tokens import ApiTokenViews
     from greentechhub_fastapi.auth.verify import EmailVerificationViews
 
 logger = logging.getLogger(__name__)
@@ -145,9 +146,7 @@ async def _granted(request: Request, user: Identity | None) -> frozenset[str] | 
     resolver = getattr(request.app.state, RESOLVER_STATE_KEY, None)
     if resolver is None:
         return None
-    granted = await resolver.granted(user)
-    setattr(request.state, _GRANTED_STATE_KEY, granted)
-    return granted
+    return await resolve_granted(request, user, resolver)
 
 
 def _is_page_request(request: Request) -> bool:
@@ -340,6 +339,11 @@ class SettingsViews:
     confirmed is the service's: save_profile should mark it unconfirmed when
     it changes, and mark_verified confirms it.
 
+    API tokens (opt-in): pass `api_tokens` (an ApiTokenViews) and the page
+    shows an "API tokens" section after Password, with its routes under
+    {url}/api-tokens; it needs register_api_tokens and
+    register_auth(bearer=True). See greentechhub_fastapi.api_tokens.
+
     CSRF (opt-in): `csrf=True` checks every POST with require_csrf (the
     X-CSRF-Token header greentechhub-ui's app shell sends on htmx requests,
     or a csrf_token field), answering 403 without it. Needs register_csrf so
@@ -373,6 +377,7 @@ class SettingsViews:
         load_profile: Callable[[Identity], Awaitable[Profile]] | None = None,
         save_profile: Callable[[Identity, Profile], Awaitable[None]] | None = None,
         verification: "EmailVerificationViews | None" = None,
+        api_tokens: "ApiTokenViews | None" = None,
         csrf: bool = False,
     ) -> None:
         if (load_profile is None) != (save_profile is None):
@@ -382,6 +387,7 @@ class SettingsViews:
         self.load_profile = load_profile
         self._save_profile = save_profile
         self._verification = verification
+        self.api_tokens = api_tokens
         self.csrf = csrf
         self._page_identity = require_page_identity(self.login_url)
 
@@ -419,6 +425,8 @@ class SettingsViews:
                 return await self._save_profile_section(request, user)
 
             router.add_api_route(f"{self.url}/profile", save_profile, methods=["POST"])
+        if self.api_tokens is not None:
+            self.api_tokens.add_routes(router, self.url, page_identity)
         return router
 
     # sections
@@ -461,6 +469,8 @@ class SettingsViews:
             sections.append(self._section("preferences", preferences, values))
         if self._change_password is not None:
             sections.append(self._password_section())
+        if self.api_tokens is not None:
+            sections.append(await self.api_tokens.section(request, user, self.url))
         if await self._can_manage(request, user):
             app_settings = self._definitions(settings, "app")
             if app_settings:

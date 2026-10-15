@@ -38,6 +38,7 @@ from greentechhub_core.permissions import GrantStore, Permission, PermissionReso
 from greentechhub_core.types import ForbiddenError, UnauthorizedError
 
 from greentechhub_fastapi.auth.dependency import get_current_user
+from greentechhub_fastapi.auth.personal_tokens import API_TOKEN_SCOPES_STATE
 from greentechhub_fastapi.dependencies.identity import require_page_identity
 from greentechhub_fastapi.htmx import _toast_trigger
 
@@ -45,6 +46,23 @@ RESOLVER_STATE_KEY = "gth_permission_resolver"
 ROLES_STATE_KEY = "gth_permission_roles"
 GRANTS_STATE_KEY = "gth_grant_store"
 _GRANTED_STATE_KEY = "gth_granted_permissions"
+
+
+async def resolve_granted(
+    request: Request, user: Identity | None, resolver: PermissionResolver
+) -> frozenset[Permission]:
+    """`user`'s granted permissions, cached per request. A caller signed in
+    with a personal API token holds only those of its owner's permissions
+    that are among the token's scopes."""
+    cached = getattr(request.state, _GRANTED_STATE_KEY, None)
+    if cached is not None:
+        return cached
+    granted = await resolver.granted(user)
+    scopes = getattr(request.state, API_TOKEN_SCOPES_STATE, None)
+    if scopes is not None:
+        granted = frozenset(p for p in granted if p in scopes)
+    setattr(request.state, _GRANTED_STATE_KEY, granted)
+    return granted
 
 
 def get_permission_resolver(request: Request) -> PermissionResolver:
@@ -59,13 +77,9 @@ async def get_granted_permissions(
     user: Identity | None = Depends(get_current_user),
     resolver: PermissionResolver = Depends(get_permission_resolver),
 ) -> frozenset[Permission]:
-    """Every permission the current user holds; empty for anonymous."""
-    cached = getattr(request.state, _GRANTED_STATE_KEY, None)
-    if cached is not None:
-        return cached
-    granted = await resolver.granted(user)
-    setattr(request.state, _GRANTED_STATE_KEY, granted)
-    return granted
+    """Every permission the current user holds; empty for anonymous (and
+    capped to a personal API token's scopes, see resolve_granted)."""
+    return await resolve_granted(request, user, resolver)
 
 
 def require_permission(permission: str) -> Callable[..., Awaitable[Identity]]:
@@ -138,6 +152,7 @@ class RoleAdminViews:
     url: str = "/admin/roles"
     login_url: str = "/login"
     title: str = "Roles"
+    icon: str = "shield-lock"  # its entry in register_admin's nav group
 
     def __init__(
         self,
@@ -149,6 +164,7 @@ class RoleAdminViews:
         csrf: bool = False,
     ) -> None:
         self._templates = templates
+        self.permission = permission
         self._guard = require_page_permission(permission, self.login_url)
         self.csrf = csrf
         self._roles = tuple(roles) if roles is not None else None

@@ -50,6 +50,53 @@ class Settings(GTHBaseSettings):
 requests. `require_csrf` and the views' `csrf=True` / `logout_csrf` opt-ins then check it. See
 "CSRF on htmx forms" in [docs/auth.md](auth.md).
 
+**Error pages.** `register_error_pages(app, settings, templates=templates)` answers browser page requests with
+greentechhub-ui's (v0.17) `403.html`, `404.html` and `500.html`. API and htmx requests keep their JSON:
+
+```python
+register_exception_handlers(app)
+register_api_error_handlers(app)                    # /api keeps the {code, message, details} envelope
+register_error_pages(app, settings, templates=templates, api_prefix="/api")
+```
+
+- **Page requests:** a page request accepts `text/html`, isn't htmx (`HX-Request`) and isn't under
+  `api_prefix` (`wants_error_page`).
+- **403 and 404:** an `HTTPException` or a core `ApplicationError` with status 403 or 404 (`NotFoundError("No such
+  stock.")`) renders `403.html` / `404.html` through `templates`, so the shell has its user menu and nav. The page
+  gets `home_url`, `login_url` (the 403's sign-in link) and the error's own message, when it has one.
+- **Other statuses:** other statuses, and every non-page request, go to whichever handler was registered before.
+  So this composes with `register_exception_handlers` and `register_api_error_handlers` in any order. The redirect
+  to the login page is unaffected.
+- **500:** any other exception renders `500.html`.
+  - It renders straight from the Jinja environment, with no context processors (they may need the database that
+    just failed). Its context is `error_reference` (the request id), `current_path`, `home_url` and `csp_nonce`.
+  - If even that fails, the response is a plain-text 500. Starlette still logs the exception and re-raises it.
+  - `RequestIDMiddleware` keeps the request id set while that error is handled, so the log line and the page's
+    reference match.
+
+**Personal API tokens.** `register_api_tokens(app, settings, store=...)` puts greentechhub-core's
+`ApiTokenStore` on the app. With `register_auth(..., bearer=True)`, a script's personal token then signs its owner
+in, capped to the token's scopes. `SettingsViews(api_tokens=ApiTokenViews(...))` adds the section that creates,
+lists and revokes them. See "Personal API tokens" in [docs/auth.md](auth.md).
+
+**CSP.** `register_csp(app)` sends a `Content-Security-Policy` header with a fresh nonce per request. The default
+is greentechhub-ui's recommended policy (its `docs/contract.md` › Content-Security-Policy). `ui_context` hands the
+nonce to templates as `csp_nonce`, and ui's `app.html` puts it on every `<script>`:
+
+```python
+from greentechhub_fastapi import register_csp
+
+register_csp(app, frame_src=[settings.GRAFANA_URL])  # e.g. for a gth_embed_card
+```
+
+- The nonce is on `request.state.csp_nonce` for a template or route of your own: `<script nonce="{{ csp_nonce }}">`.
+- `frame_src=` and `connect_src=` add origins to those directives. `policy=` replaces the whole policy (write
+  `{nonce}` where the nonce goes), for example to add `'unsafe-eval'`.
+- A route that sets its own `Content-Security-Policy` keeps it.
+- Scripts need `'self'` or the nonce, so templates mustn't use the htmx features that `eval`: `hx-on`, `hx-vars`,
+  `js:` in `hx-vals`, and `[…]` filters in `hx-trigger`. Mount ui's `static_dirs()` too, since the CDN defaults are
+  off-origin.
+
 ## Permissions
 
 `register_permissions` is opt-in: nothing checks permissions until a service calls it and puts a `require_*`
@@ -418,6 +465,36 @@ await audit(request, "stock.archived", target=("stock", stock.id), summary=f"Arc
 `page_title`, `audit_url`, `audit_filters` (`actor`, `action`, `on_or_before`), `audit_entries` (each `at`, `actor`,
 `action`, `target` as `"type:id"` or `None`, `summary`, `details`) and `audit_next_url` (the older page, keeping the
 filters, or `None`). An unreadable date or cursor is ignored, not refused.
+
+
+## Admin
+
+`register_admin(app, settings, views=[...])` mounts a service's admin pages and returns their "Admin" nav group for
+greentechhub-ui:
+
+```python
+from greentechhub_fastapi import register_admin
+from greentechhub_fastapi.audit import AuditViews
+from greentechhub_fastapi.permissions import RoleAdminViews
+
+audit_views = AuditViews(templates=templates, permission="audit.view")
+register_audit(app, settings, store=store, views=audit_views)
+admin_nav = register_admin(app, settings, views=[
+    RoleAdminViews(templates=templates, permission="users.manage"),
+    audit_views,  # register_audit already mounted it, so it isn't mounted twice
+])
+greentechhub_ui.install(templates.env, service_name="…",
+                        nav_items=build_nav_items(custom_items=[..., admin_nav]))
+```
+
+- Each view is one child of the group: its `title`, `url` and `icon`, with its `permission` as
+  `required_permission`. `RoleAdminViews` is "Roles" (`shield-lock`) and `AuditViews` is "Audit log"
+  (`journal-text`). Override `title`/`url`/`icon` on a subclass like any view attribute.
+- ui's nav filtering hides the pages a viewer can't open. The group has no `url` of its own, so it disappears when
+  none are left: only people with at least one admin permission see "Admin".
+- A service's own admin page joins by having `url`, `title`, `icon`, `permission` and `router()`
+  (`greentechhub_fastapi.admin.AdminView`). `label=` and `icon=` rename the group. `admin_nav_item(views)` builds
+  the group without mounting anything.
 
 ## Email
 

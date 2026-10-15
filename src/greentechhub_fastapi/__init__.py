@@ -49,20 +49,36 @@ greentechhub_fastapi.notifications.
 register_email likewise; send_email, get_email_sender and recipient_address
 live in greentechhub_fastapi.email.
 
+register_csp likewise; CspMiddleware, DEFAULT_CSP and content_security_policy
+live in greentechhub_fastapi.middleware.
+
 register_csrf likewise; require_csrf and CsrfMiddleware live in
 greentechhub_fastapi.auth.csrf.
 
 register_audit likewise; audit, get_audit_store and AuditViews live in
 greentechhub_fastapi.audit.
+
+register_api_tokens likewise; ApiTokenViews, get_api_token_store and
+resolve_api_token live in greentechhub_fastapi.api_tokens.
+
+register_error_pages likewise; wants_error_page lives in
+greentechhub_fastapi.exceptions.
+
+register_admin likewise; admin_nav_item and AdminView live in
+greentechhub_fastapi.admin.
 """
 
 from greentechhub_fastapi.exceptions import register_api_error_handlers, register_exception_handlers
 from greentechhub_fastapi.registration import (
+    register_admin,
+    register_api_tokens,
     register_audit,
     register_auth,
     register_core,
+    register_csp,
     register_csrf,
     register_email,
+    register_error_pages,
     register_events,
     register_flash,
     register_health,
@@ -73,12 +89,16 @@ from greentechhub_fastapi.registration import (
 )
 
 __all__ = [
+    "register_admin",
     "register_api_error_handlers",
+    "register_api_tokens",
     "register_audit",
     "register_auth",
     "register_core",
+    "register_csp",
     "register_csrf",
     "register_email",
+    "register_error_pages",
     "register_events",
     "register_exception_handlers",
     "register_flash",
