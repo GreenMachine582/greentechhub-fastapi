@@ -33,14 +33,6 @@ ui drops its CDN-URL defaults, so services must mount `greentechhub_ui.static_di
 What PyFinBot still needs from this package. One PR each, in this order; PyFinBot's `todo.md` holds the adoption PR
 for each once it ships.
 
-- [ ] 2. `feat(admin): register_admin`
-  - **Why:** PyFinBot now has two admin pages (Roles, Audit log), and more will follow (users admin).
-  - **Scope:**
-    - an "Admin" `NavItem` group whose children are the mounted admin views (`RoleAdminViews`, `AuditViews`), each
-      with its permission as `required_permission`;
-    - the group shows only when one of its children does.
-    - Plain dicts, so it needs no ui change: ui's `nav_visible` already filters by permission.
-  - **Done when:** PyFinBot's nav shows Roles and Audit log under Admin, to admins only.
 - [ ] 3. `feat(auth): personal API tokens`
   - **Why:** PyFinBot's API is used from scripts with 24h login JWTs, which can't be revoked (a known limitation in
     its `todo.md`).

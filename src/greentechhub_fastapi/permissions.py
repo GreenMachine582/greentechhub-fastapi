@@ -138,6 +138,7 @@ class RoleAdminViews:
     url: str = "/admin/roles"
     login_url: str = "/login"
     title: str = "Roles"
+    icon: str = "shield-lock"  # its entry in register_admin's nav group
 
     def __init__(
         self,
@@ -149,6 +150,7 @@ class RoleAdminViews:
         csrf: bool = False,
     ) -> None:
         self._templates = templates
+        self.permission = permission
         self._guard = require_page_permission(permission, self.login_url)
         self.csrf = csrf
         self._roles = tuple(roles) if roles is not None else None
