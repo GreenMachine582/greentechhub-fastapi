@@ -10,6 +10,7 @@ FastAPI's defaults, so web pages (HTML errors, login redirects, HX-Redirect)
 are untouched. Opt-in: call it alongside register_exception_handlers.
 """
 
+import inspect
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -54,11 +55,14 @@ def register_api_error_handlers(
     - core's UnauthorizedError: its envelope plus `WWW-Authenticate:
       <www_authenticate>` (the OAuth2 bearer challenge; None to omit).
 
-    Outside the prefix FastAPI's defaults apply (UnauthorizedError keeps the
-    envelope, without the header). Every other ApplicationError is
+    Outside the prefix, whatever HTTPException handler was registered before
+    (FastAPI's default, or register_error_pages' pages) still applies, so the
+    two compose in either order; UnauthorizedError keeps the envelope, without
+    the header. Every other ApplicationError is
     register_exception_handlers' job — call both.
     """
     base = "/" + prefix.strip("/")
+    previous_http = app.exception_handlers.get(StarletteHTTPException, http_exception_handler)
 
     def _is_api(request: Request) -> bool:
         path = request.url.path
@@ -67,7 +71,8 @@ def register_api_error_handlers(
     @app.exception_handler(StarletteHTTPException)
     async def _http_exception(request: Request, exc: StarletteHTTPException) -> Response:
         if not _is_api(request):
-            return await http_exception_handler(request, exc)
+            response = previous_http(request, exc)
+            return await response if inspect.isawaitable(response) else response
         # An HTTPException can name its own code (e.g. query.QueryParamError's
         # invalid_sort); otherwise the status picks it.
         code = getattr(exc, "code", None) or HTTP_STATUS_CODES.get(
