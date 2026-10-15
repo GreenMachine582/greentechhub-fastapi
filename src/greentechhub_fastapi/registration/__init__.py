@@ -6,6 +6,7 @@ from greentechhub_fastapi.registration.core import register_core
 from greentechhub_fastapi.registration.csp import register_csp
 from greentechhub_fastapi.registration.csrf import register_csrf
 from greentechhub_fastapi.registration.email import register_email
+from greentechhub_fastapi.registration.error_pages import register_error_pages
 from greentechhub_fastapi.registration.events import register_events
 from greentechhub_fastapi.registration.flash import register_flash
 from greentechhub_fastapi.registration.health import register_health
@@ -23,6 +24,7 @@ __all__ = [
     "register_csp",
     "register_csrf",
     "register_email",
+    "register_error_pages",
     "register_events",
     "register_flash",
     "register_health",

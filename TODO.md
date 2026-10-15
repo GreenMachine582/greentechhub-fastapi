@@ -33,15 +33,6 @@ ui drops its CDN-URL defaults, so services must mount `greentechhub_ui.static_di
 What PyFinBot still needs from this package. One PR each, in this order; PyFinBot's `todo.md` holds the adoption PR
 for each once it ships.
 
-- [ ] 4. `feat(errors): register_error_pages`
-  - **Why:** greentechhub-ui v0.17 ships `403.html`/`404.html`/`500.html`, but rendering them is a recipe each service
-    copies from ui's docs/components.md › Error pages. PyFinBot hasn't, so its pages show FastAPI's JSON errors.
-  - **Scope:**
-    - the recipe as a helper: browser page requests (accept HTML, not htmx, not under the API prefix) get the pages;
-      API and htmx requests keep the defaults;
-    - the 500 page carries `error_reference` from the request id, and its context stays failure-proof;
-    - opt-in, takes the service's `templates` and API prefix.
-  - **Done when:** PyFinBot's `/nope` renders ui's 404 page, and `/api/nope` still returns JSON.
 - [ ] 5. `feat(query): get_owned_or_404`
   - **Why:** PyFinBot's stock and transaction routes each hand-roll "this row, or 404 when it's missing or not the
     caller's" (`_get_stock_or_404`, `_get_transaction_or_404`); every per-user model needs it.

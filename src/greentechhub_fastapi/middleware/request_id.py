@@ -39,10 +39,13 @@ class RequestIDMiddleware:
                 headers.append(self.header_name, request_id)
             await send(message)
 
-        try:
-            await self.app(scope, receive, send_with_request_id)
-        finally:
-            reset_request_id(token)
+        # Reset only on the way out of a normal response. An exception that
+        # escapes is handled further out (Starlette's ServerErrorMiddleware:
+        # its log line, register_error_pages' 500 page) in this request's own
+        # task context, which still needs the id; that context ends with the
+        # request, so nothing leaks into the next one.
+        await self.app(scope, receive, send_with_request_id)
+        reset_request_id(token)
 
 
 def _get_header(scope: Scope, name: str) -> str | None:

@@ -61,6 +61,9 @@ greentechhub_fastapi.audit.
 register_api_tokens likewise; ApiTokenViews, get_api_token_store and
 resolve_api_token live in greentechhub_fastapi.api_tokens.
 
+register_error_pages likewise; wants_error_page lives in
+greentechhub_fastapi.exceptions.
+
 register_admin likewise; admin_nav_item and AdminView live in
 greentechhub_fastapi.admin.
 """
@@ -75,6 +78,7 @@ from greentechhub_fastapi.registration import (
     register_csp,
     register_csrf,
     register_email,
+    register_error_pages,
     register_events,
     register_flash,
     register_health,
@@ -94,6 +98,7 @@ __all__ = [
     "register_csp",
     "register_csrf",
     "register_email",
+    "register_error_pages",
     "register_events",
     "register_exception_handlers",
     "register_flash",

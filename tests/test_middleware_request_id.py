@@ -50,3 +50,28 @@ def test_two_requests_get_different_request_ids(settings):
     first = asyncio.run(_get(app, "/probe"))
     second = asyncio.run(_get(app, "/probe"))
     assert first.headers["X-Request-ID"] != second.headers["X-Request-ID"]
+
+
+
+def test_request_id_stays_set_while_an_escaping_error_is_handled(settings):
+    seen = []
+    app = _build_app(settings)
+
+    @app.get("/boom")
+    async def boom():
+        raise RuntimeError("kaboom")
+
+    @app.exception_handler(Exception)
+    async def server_error(request, exc):
+        from fastapi.responses import PlainTextResponse
+
+        seen.append(get_request_id())
+        return PlainTextResponse("err", status_code=500)
+
+    async def go():
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/boom", headers={"X-Request-ID": "req-9"})
+
+    assert asyncio.run(go()).status_code == 500
+    assert seen == ["req-9"]

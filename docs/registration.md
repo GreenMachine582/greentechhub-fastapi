@@ -50,6 +50,30 @@ class Settings(GTHBaseSettings):
 requests. `require_csrf` and the views' `csrf=True` / `logout_csrf` opt-ins then check it. See
 "CSRF on htmx forms" in [docs/auth.md](auth.md).
 
+**Error pages.** `register_error_pages(app, settings, templates=templates)` answers browser page requests with
+greentechhub-ui's (v0.17) `403.html`, `404.html` and `500.html`. API and htmx requests keep their JSON:
+
+```python
+register_exception_handlers(app)
+register_api_error_handlers(app)                    # /api keeps the {code, message, details} envelope
+register_error_pages(app, settings, templates=templates, api_prefix="/api")
+```
+
+- **Page requests:** a page request accepts `text/html`, isn't htmx (`HX-Request`) and isn't under
+  `api_prefix` (`wants_error_page`).
+- **403 and 404:** an `HTTPException` or a core `ApplicationError` with status 403 or 404 (`NotFoundError("No such
+  stock.")`) renders `403.html` / `404.html` through `templates`, so the shell has its user menu and nav. The page
+  gets `home_url`, `login_url` (the 403's sign-in link) and the error's own message, when it has one.
+- **Other statuses:** other statuses, and every non-page request, go to whichever handler was registered before.
+  So this composes with `register_exception_handlers` and `register_api_error_handlers` in any order. The redirect
+  to the login page is unaffected.
+- **500:** any other exception renders `500.html`.
+  - It renders straight from the Jinja environment, with no context processors (they may need the database that
+    just failed). Its context is `error_reference` (the request id), `current_path`, `home_url` and `csp_nonce`.
+  - If even that fails, the response is a plain-text 500. Starlette still logs the exception and re-raises it.
+  - `RequestIDMiddleware` keeps the request id set while that error is handled, so the log line and the page's
+    reference match.
+
 **Personal API tokens.** `register_api_tokens(app, settings, store=...)` puts greentechhub-core's
 `ApiTokenStore` on the app. With `register_auth(..., bearer=True)`, a script's personal token then signs its owner
 in, capped to the token's scopes. `SettingsViews(api_tokens=ApiTokenViews(...))` adds the section that creates,
