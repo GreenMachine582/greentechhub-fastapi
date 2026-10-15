@@ -18,7 +18,8 @@ Deliberately NOT included: Strict-Transport-Security (this middleware runs
 before/independent of TLS-termination awareness — see ProxyHeadersMiddleware; an
 HSTS header on a response that might legitimately be served over plain HTTP behind
 a non-TLS-terminating proxy would be actively harmful), and Content-Security-Policy
-(inherently service-specific, no safe universal default exists).
+(service-specific, and it needs a per-request nonce: register_csp adds it, opt-in,
+with greentechhub-ui's recommended policy).
 """
 
 from starlette.datastructures import MutableHeaders

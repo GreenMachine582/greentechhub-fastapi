@@ -1,6 +1,7 @@
 from greentechhub_fastapi.registration.audit import register_audit
 from greentechhub_fastapi.registration.auth import register_auth
 from greentechhub_fastapi.registration.core import register_core
+from greentechhub_fastapi.registration.csp import register_csp
 from greentechhub_fastapi.registration.csrf import register_csrf
 from greentechhub_fastapi.registration.email import register_email
 from greentechhub_fastapi.registration.events import register_events
@@ -15,6 +16,7 @@ __all__ = [
     "register_audit",
     "register_auth",
     "register_core",
+    "register_csp",
     "register_csrf",
     "register_email",
     "register_events",

@@ -33,19 +33,6 @@ ui drops its CDN-URL defaults, so services must mount `greentechhub_ui.static_di
 What PyFinBot still needs from this package. One PR each, in this order; PyFinBot's `todo.md` holds the adoption PR
 for each once it ships.
 
-- [ ] 1. `feat(security): register_csp`
-  - **Why:** greentechhub-ui v0.17's shell is CSP-ready (nonces on every script), but each FastAPI service
-    hand-writes the nonce middleware and context processor from ui's `docs/contract.md` › Content-Security-Policy.
-    `SecurityHeadersMiddleware` leaves CSP out on purpose. PyFinBot needs a strict policy, plus a `frame-src` for
-    its Grafana `gth_embed_card`.
-  - **Scope:**
-    - a per-request `csp_nonce` on `request.state`, which `ui_context` passes to templates;
-    - a `Content-Security-Policy` header, with ui's recommended policy as the default;
-    - `frame_src=` / `connect_src=` extras (e.g. the Grafana origin);
-    - `setdefault`, so a route can send its own;
-    - opt-in, like `register_csrf`.
-  - **Done when:** a page's scripts carry the nonce under the header, and ui's playground can take its policy from
-    it.
 - [ ] 2. `feat(admin): register_admin`
   - **Why:** PyFinBot now has two admin pages (Roles, Audit log), and more will follow (users admin).
   - **Scope:**

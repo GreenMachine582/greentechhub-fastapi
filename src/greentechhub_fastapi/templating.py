@@ -20,6 +20,8 @@ from starlette.types import ASGIApp
 # CsrfMiddleware's request.state key (auth/csrf.py). A literal, not an import:
 # importing greentechhub_fastapi.auth here would pull in every auth view.
 CSRF_STATE = "gth_csrf_token"
+# CspMiddleware's (middleware/csp.py), the name greentechhub-ui's recipe uses.
+CSP_STATE = "csp_nonce"
 
 
 def ui_context(request: Request) -> dict[str, Any]:
@@ -31,10 +33,15 @@ def ui_context(request: Request) -> dict[str, Any]:
     wins over a route's current_path.
 
     With register_csrf, also `csrf_token`: greentechhub-ui's app shell sends
-    it on every htmx request (hx-headers) and in the navbar's logout form."""
+    it on every htmx request (hx-headers) and in the navbar's logout form.
+
+    With register_csp, also `csp_nonce`: greentechhub-ui's app shell puts it
+    on every <script> it renders."""
     context: dict[str, Any] = {"current_path": request.url.path}
     if token := getattr(request.state, CSRF_STATE, None):
         context["csrf_token"] = token
+    if nonce := getattr(request.state, CSP_STATE, None):
+        context["csp_nonce"] = nonce
     return context
 
 
