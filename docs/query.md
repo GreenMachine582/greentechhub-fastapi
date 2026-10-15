@@ -130,6 +130,28 @@ async def export(...):
 - `csv_value(value)` turns a cell into text that reads back exactly: `None` becomes `""`, a `Decimal` keeps full
   precision without trailing zeros or E-notation (`12.50` → `12.5`), and a date or datetime is ISO.
 
+## Lenient page filters
+
+A page's own filters (a report's date, a table's cost method) should never 422 on a hand-edited or stale URL.
+`greentechhub_fastapi.query` reads them leniently: a missing, blank or unreadable value gives the default.
+
+```python
+from greentechhub_fastapi.query import optional_choice, optional_date, optional_int
+
+q = request.query_params
+on = optional_date(q.get("on"), date.today())                       # "2025-07-01", else today
+method = optional_choice(q.get("method"), CostMethod, CostMethod.AVERAGE)  # an Enum's value, else the default
+stock_id = optional_int(q.get("stock"))                              # a whole number, else None
+```
+
+- `optional_date(raw, default=None)` takes an ISO date. `optional_datetime(raw, default=None)` takes an ISO
+  datetime, and makes it UTC when it has no offset.
+- `optional_int(raw, default=None)` takes a whole number, with a leading `-` allowed.
+- `optional_choice(raw, choices, default)` takes one of an Enum's values, which gives the member, or one of an
+  iterable of strings.
+- All of them strip whitespace first. `AuditViews` reads its `on_or_before` and `before` with these.
+- For an API, where a bad value should be an error, use FastAPI's typed parameters instead.
+
 ## One row, or 404
 
 `get_owned_or_404(session, Model, id, owner=None, owner_field="user_id", detail=None)` loads one row by primary
