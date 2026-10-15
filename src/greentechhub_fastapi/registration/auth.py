@@ -31,7 +31,7 @@ from greentechhub_core.identity import AuthentikIdentityProvider, DevelopmentIde
 from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.auth.forward_auth import build_forward_auth_get_current_user
 from greentechhub_fastapi.auth.local import build_local_get_current_user
-from greentechhub_fastapi.auth.tokens import IDENTITY_PROVIDER_STATE_KEY
+from greentechhub_fastapi.auth.tokens import BEARER_AUTH_STATE_KEY, IDENTITY_PROVIDER_STATE_KEY
 from greentechhub_fastapi.registration._settings import read_str_setting
 
 _KNOWN_ADAPTERS = ("local", "forward_auth")
@@ -44,6 +44,7 @@ def register_auth(app: FastAPI, settings: GTHBaseSettings, *, bearer: bool = Fal
     require_permission as pages; forward_auth ignores it (Authentik signs
     people in, not tokens)."""
     adapter = read_str_setting(settings, "AUTH_ADAPTER", "local")
+    setattr(app.state, BEARER_AUTH_STATE_KEY, adapter == "local" and bearer)
 
     if adapter == "local":
         provider = DevelopmentIdentityProvider(secret_key=settings.secret_key)

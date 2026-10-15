@@ -411,8 +411,27 @@ router = APIRouter(dependencies=[Depends(require_csrf)])  # your own htmx routes
 - `SettingsViews(csrf=True)` checks every POST, including the theme toggle's save, which greentechhub-ui sends
   through htmx with the page's headers. `RoleAdminViews(csrf=True)` checks assign, set and remove.
   `LoginViews.logout_csrf = True` checks `POST /logout`. Without these, nothing changes.
-- JSON API routes don't need it. A bearer token isn't sent by the browser on its own, so another site can't ride
-  on it.
+- **JSON API routes** take `require_cookie_csrf` instead. With `register_auth(bearer=True)`, an API request
+  without an `Authorization` header falls back to the session cookie, so a browser's cookie works on `/api` too.
+  `require_csrf` there would make every script send a CSRF token:
+
+  ```python
+  from greentechhub_fastapi.auth.csrf import require_cookie_csrf
+
+  api = APIRouter(prefix="/api", dependencies=[Depends(require_cookie_csrf)])
+  ```
+
+  - A request the session cookie signs in is checked exactly as `require_csrf` checks it.
+  - A request with a bearer header the app resolves isn't checked: the header alone decides who it is, and a
+    browser never sends it on its own. Without `bearer=True`, the cookie is what signs the caller in, so a bearer
+    header doesn't skip the check.
+  - An anonymous request (no cookie, no bearer) has nothing for another site to ride on, so a script's
+    `POST /api/auth/login` still works.
+  - Browser code sends the token as `X-CSRF-Token`. greentechhub-ui's app shell already does on htmx requests. A
+    `fetch()` of your own sends the page's `csrf_token`.
+  - `forward_auth` isn't covered. There the session is the proxy's (Authentik's) cookie.
+  - The session cookie's `SameSite=Lax` already keeps other sites' POSTs from carrying it, so this is defence in
+    depth.
 
 ## Requiring a login on page routes
 
