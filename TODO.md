@@ -29,22 +29,9 @@ ui drops its CDN-URL defaults, so services must mount `greentechhub_ui.static_di
 - [ ] When it lands, check `mount_static_dirs` in docs/registration.md and the README example still match what ui
   requires, and that the playground mounts them.
 
-### M6 PyFinBot ready — next
-What PyFinBot still needs from this package. One PR each, in this order; PyFinBot's `todo.md` holds the adoption PR
-for each once it ships.
-
-- [ ] 6. `feat(auth): CSRF for cookie-authenticated API calls`
-  - **Why:** with `register_auth(bearer=True)`, an API request without an `Authorization` header falls back to the
-    session cookie, so a browser's cookie works on PyFinBot's `/api` too. `require_csrf` can't sit on the API
-    router, because bearer clients (scripts) would then need a CSRF token. The cookie's `SameSite=Lax` already keeps
-    other sites' POSTs from carrying it, so this is defence in depth.
-  - **Scope:**
-    - a dependency (or a `require_csrf` option) that checks the token only when the request was authenticated by
-      the session cookie, never when it carried a bearer header;
-    - safe methods pass, as with `require_csrf`;
-    - opt-in for an API router (`dependencies=[...]`).
-  - **Done when:** PyFinBot's `/api` refuses a cookie-authenticated POST without the token, while a bearer-token
-    POST needs none.
+### M6 PyFinBot ready — shipped
+This package's share is done (the next release's CHANGELOG lists it): `register_csp`, `register_admin`, personal API tokens,
+`register_error_pages`, `get_owned_or_404` and `require_cookie_csrf`. PyFinBot's `todo.md` holds the adoption PRs.
 
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,

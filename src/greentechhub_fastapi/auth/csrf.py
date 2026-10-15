@@ -25,6 +25,9 @@ shell then sends it on every htmx request as the X-CSRF-Token header and as
 a hidden field on the navbar's logout form. require_csrf checks either on a
 state-changing route; SettingsViews(csrf=True), RoleAdminViews(csrf=True)
 and LoginViews.logout_csrf opt this package's own routes in.
+
+An API router takes require_cookie_csrf instead: it checks only a request
+the session cookie signs in, so scripts sending a bearer token need none.
 """
 
 import string
@@ -37,6 +40,10 @@ from greentechhub_core.security import constant_time_compare, generate_token
 from starlette.datastructures import MutableHeaders
 from starlette.requests import HTTPConnection
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from greentechhub_fastapi.auth.cookies import SESSION_COOKIE_NAME
+from greentechhub_fastapi.auth.local import bearer_token
+from greentechhub_fastapi.auth.tokens import BEARER_AUTH_STATE_KEY
 
 CSRF_COOKIE_NAME = "gth_csrf"
 CSRF_FIELD = "csrf_token"
@@ -91,6 +98,24 @@ async def require_csrf(request: Request) -> None:
         submitted = str((await request.form()).get(CSRF_FIELD) or "")
     if not csrf_ok(request, submitted):
         raise HTTPException(status_code=403, detail=CSRF_REFUSED)
+
+
+async def require_cookie_csrf(request: Request) -> None:
+    """require_csrf for an API router, where scripts call with a bearer token
+    and a browser with the session cookie:
+    `APIRouter(prefix="/api", dependencies=[Depends(require_cookie_csrf)])`.
+
+    A request the session cookie signs in is checked as require_csrf checks
+    it. One with a bearer header the app resolves (register_auth(...,
+    bearer=True)) isn't, since that header alone decides who it is and a
+    browser never sends it on its own; nor is an anonymous one, which has
+    nothing for another site to ride on (a script's POST /api/auth/login).
+    """
+    if getattr(request.app.state, BEARER_AUTH_STATE_KEY, False) and bearer_token(request):
+        return
+    if SESSION_COOKIE_NAME not in request.cookies:
+        return
+    await require_csrf(request)
 
 
 class CsrfMiddleware:
