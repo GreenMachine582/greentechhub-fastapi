@@ -26,6 +26,7 @@ from fastapi import Request
 from greentechhub_core.identity import DevelopmentIdentityProvider, Identity, RawAuthContext
 
 from greentechhub_fastapi.auth.cookies import SESSION_COOKIE_NAME
+from greentechhub_fastapi.auth.personal_tokens import looks_like_personal_token, resolve_api_token
 
 
 def bearer_token(request: Request) -> str | None:
@@ -44,11 +45,14 @@ def build_local_get_current_user(
 ) -> Callable[[Request], Awaitable[Identity | None]]:
     """The local adapter's get_current_user: the session cookie's identity.
     With `bearer`, an `Authorization: Bearer` token is resolved first (an
-    API client's token from issue_token): when the header is there, it
+    API client's token from issue_token, or a personal API token when
+    register_api_tokens installed a store): when the header is there, it
     alone decides, so a bad token never falls back to a cookie."""
 
     async def _get_current_user(request: Request) -> Identity | None:
         if bearer and (token := bearer_token(request)):
+            if looks_like_personal_token(token):
+                return await resolve_api_token(request, token)
             return await provider.resolve(RawAuthContext(token=token))
         token = request.cookies.get(cookie_name)
         if not token:

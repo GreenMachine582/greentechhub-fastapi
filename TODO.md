@@ -33,15 +33,6 @@ ui drops its CDN-URL defaults, so services must mount `greentechhub_ui.static_di
 What PyFinBot still needs from this package. One PR each, in this order; PyFinBot's `todo.md` holds the adoption PR
 for each once it ships.
 
-- [ ] 3. `feat(auth): personal API tokens`
-  - **Why:** PyFinBot's API is used from scripts with 24h login JWTs, which can't be revoked (a known limitation in
-    its `todo.md`).
-  - **Scope:**
-    - an `ApiTokenViews` section in Settings: create (the token shown once), list with last use, revoke;
-    - `register_auth(bearer=True)` also resolves a hashed personal token;
-    - a token's scopes are permissions, capped by its owner's.
-  - **Needs:** core's API token store (core TODO › API tokens).
-  - **Done when:** a script authenticates with a personal token, and revoking it refuses the next call.
 - [ ] 4. `feat(errors): register_error_pages`
   - **Why:** greentechhub-ui v0.17 ships `403.html`/`404.html`/`500.html`, but rendering them is a recipe each service
     copies from ui's docs/components.md › Error pages. PyFinBot hasn't, so its pages show FastAPI's JSON errors.
