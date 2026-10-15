@@ -129,3 +129,24 @@ async def export(...):
   LibreOffice read UTF-8 (pandas: `encoding="utf-8-sig"`).
 - `csv_value(value)` turns a cell into text that reads back exactly: `None` becomes `""`, a `Decimal` keeps full
   precision without trailing zeros or E-notation (`12.50` → `12.5`), and a date or datetime is ISO.
+
+## One row, or 404
+
+`get_owned_or_404(session, Model, id, owner=None, owner_field="user_id", detail=None)` loads one row by primary
+key, or raises `HTTPException(404, "<Model> not found")`:
+
+```python
+from greentechhub_fastapi.query import get_owned_or_404
+
+stock = await get_owned_or_404(session, Stock, stock_id)                       # shared rows
+txn = await get_owned_or_404(session, Transaction, txn_id, owner=identity.subject)  # per-user rows
+```
+
+- With `owner`, a row whose `owner_field` isn't `owner` counts as missing. Someone else's row is a 404, not a 403,
+  so a guessed id can't tell "exists but isn't yours" from "doesn't exist".
+- It's one `session.get`, so it works with a SQLAlchemy or SQLModel `AsyncSession` and with a composite key (pass a
+  tuple).
+- The 404 becomes `register_error_pages`' page (with the detail as its message), `register_api_error_handlers`'
+  `not_found` envelope under the API prefix, or FastAPI's default.
+- `owner` with a model that has no `owner_field` raises `AttributeError`: that's a bug, not a missing row.
+
