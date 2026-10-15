@@ -50,6 +50,24 @@ class Settings(GTHBaseSettings):
 requests. `require_csrf` and the views' `csrf=True` / `logout_csrf` opt-ins then check it. See
 "CSRF on htmx forms" in [docs/auth.md](auth.md).
 
+**CSP.** `register_csp(app)` sends a `Content-Security-Policy` header with a fresh nonce per request. The default
+is greentechhub-ui's recommended policy (its `docs/contract.md` › Content-Security-Policy). `ui_context` hands the
+nonce to templates as `csp_nonce`, and ui's `app.html` puts it on every `<script>`:
+
+```python
+from greentechhub_fastapi import register_csp
+
+register_csp(app, frame_src=[settings.GRAFANA_URL])  # e.g. for a gth_embed_card
+```
+
+- The nonce is on `request.state.csp_nonce` for a template or route of your own: `<script nonce="{{ csp_nonce }}">`.
+- `frame_src=` and `connect_src=` add origins to those directives. `policy=` replaces the whole policy (write
+  `{nonce}` where the nonce goes), for example to add `'unsafe-eval'`.
+- A route that sets its own `Content-Security-Policy` keeps it.
+- Scripts need `'self'` or the nonce, so templates mustn't use the htmx features that `eval`: `hx-on`, `hx-vars`,
+  `js:` in `hx-vals`, and `[…]` filters in `hx-trigger`. Mount ui's `static_dirs()` too, since the CDN defaults are
+  off-origin.
+
 ## Permissions
 
 `register_permissions` is opt-in: nothing checks permissions until a service calls it and puts a `require_*`
