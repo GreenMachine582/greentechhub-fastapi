@@ -94,8 +94,8 @@ register_csp(app, frame_src=[settings.GRAFANA_URL])  # e.g. for a gth_embed_card
   `{nonce}` where the nonce goes), for example to add `'unsafe-eval'`.
 - A route that sets its own `Content-Security-Policy` keeps it.
 - Scripts need `'self'` or the nonce, so templates mustn't use the htmx features that `eval`: `hx-on`, `hx-vars`,
-  `js:` in `hx-vals`, and `[…]` filters in `hx-trigger`. Mount ui's `static_dirs()` too, since the CDN defaults are
-  off-origin.
+  `js:` in `hx-vals`, and `[…]` filters in `hx-trigger`. ui serves its assets from `static_dirs()`, which every
+  service mounts anyway (required since ui v0.19, which has no CDN fallback), so they're all `'self'`.
 
 ## Permissions
 
@@ -187,10 +187,11 @@ from greentechhub_core.settings import JsonFileSettingsStore, SettingsRegistry
 from greentechhub_core.settings.builtins import USER_PREFERENCES
 from greentechhub_fastapi import register_auth, register_permissions, register_settings
 from greentechhub_fastapi.settings import SettingsViews, settings_context
-from greentechhub_fastapi.templating import ui_context
+from greentechhub_fastapi.templating import mount_static_dirs, ui_context
 
 templates = Jinja2Templates(directory="templates", context_processors=[ui_context, settings_context])
 greentechhub_ui.install(templates.env, service_name="…", nav_items=[…])
+mount_static_dirs(app, greentechhub_ui.static_dirs())  # ui's assets; required since ui v0.19 (no CDN fallback)
 
 register_auth(app, settings)
 register_permissions(app, settings, roles=[ADMIN])        # ROLE_BOOTSTRAP=alice=admin for the first admin
@@ -418,7 +419,7 @@ re-fetches the badge from `notifications_nav_item()`. A form without htmx can po
 redirected there (303) instead; anything else is ignored, so it's never an open redirect.
 
 **Templates.** They default to greentechhub-ui's notification centre (`notifications_page.html`,
-`notifications_panel.html`, `notification_badge.html`, still to come there); set `page_template` / `panel_template` /
+`notifications_panel.html`, `notification_badge.html`); set `page_template` / `panel_template` /
 `badge_template` to use your own. The page and panel get `page_title`, `notifications`, `unread_count`,
 `unread_only`, `page_url` and `mark_all_url`. Each notification is a dict of its fields (`id`, `message`, `kind`,
 `title`, `icon`, `action_label`, `action_url`, `category`, `created_at`, `read_at`) plus `read`, `read_url` and
