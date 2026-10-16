@@ -392,8 +392,8 @@ await notify(app, user, toast("Sync finished", kind="success"), category="sync")
 ```
 
 - `notify(app, recipient, payload, *, category="general")` takes an `Identity` or a bare subject (for a job with no
-  `Identity`) and a greentechhub-ui `toast()` payload, either its detail or the whole `{"showToast": ...}`. It stores
-  the notice and returns it.
+  `Identity`) and a greentechhub-ui `toast()` payload: what `toast()` returns (its `HX-Trigger` JSON text), that
+  value decoded (`{"showToast": ...}`), or just its detail dict. It stores the notice and returns it.
 - **Delivery preferences:** register core's `notification_preferences({"sync": "Sync results"})` settings through
   `register_settings` and each person picks, per category, in the app, by email, both or off, on the settings page.
   `notify` stores nothing and returns `None` when their choice leaves out the app. A category without a preference
