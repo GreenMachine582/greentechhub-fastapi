@@ -60,6 +60,25 @@ registration order.
 
 Small `Depends`-ready helpers beyond auth (current identity, feature-flag lookups, pagination params) — grows only when a real service needs a new helper, not scoped up front, matching `greentechhub-core`'s own bias against dumping-ground modules.
 
+## Uploads
+
+`uploads.read_upload(file, *, limit)` reads an uploaded file with a size cap. It's the server half of
+greentechhub-ui's `gth_file_drop`, whose client-side size check is a convenience, not a guard:
+
+```python
+from greentechhub_fastapi.uploads import UploadTooLargeError, read_upload
+
+@router.post("/import")
+async def import_file(file: UploadFile = File(...)):
+    content = await read_upload(file, limit=5 * 1024 * 1024)
+```
+
+- It reads at most `limit + 1` bytes, so an oversized upload is never buffered whole.
+- Over the limit it raises `UploadTooLargeError` ("File is larger than 5 MB."). That's a core `ApplicationError`
+  with a 413 status hint and the `payload_too_large` code, so `register_exception_handlers` answers it with the
+  envelope. A page route can catch it and render its own form error instead.
+- `file` is Starlette's `UploadFile`, or anything with an async `read(size)`.
+
 ## greentechhub-ui glue (v0.8)
 
 The FastAPI half of greentechhub-ui's framework-neutral setup helpers (its `docs/contract.md`, "Setup"). This
