@@ -25,7 +25,7 @@ changed, never their values).
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
 from urllib.parse import urlencode
 
@@ -35,6 +35,7 @@ from greentechhub_core.audit import AuditEntry, AuditStore, new_entry
 from greentechhub_core.identity import Identity
 
 from greentechhub_fastapi.permissions import require_page_permission
+from greentechhub_fastapi.query.lenient import optional_date, optional_datetime
 
 AUDIT_STATE_KEY = "gth_audit"
 
@@ -87,23 +88,6 @@ async def audit(
     return entry
 
 
-def _day(raw: str) -> date | None:
-    try:
-        return date.fromisoformat(raw) if raw else None
-    except ValueError:
-        return None
-
-
-def _when(raw: str) -> datetime | None:
-    try:
-        parsed = datetime.fromisoformat(raw) if raw else None
-    except ValueError:
-        return None
-    if parsed is not None and parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed
-
-
 class AuditViews:
     """The audit log admin page. Mount it like RoleAdminViews, or pass it to
     register_audit(..., views=):
@@ -143,8 +127,8 @@ class AuditViews:
         query = request.query_params
         actor = (query.get("actor") or "").strip()
         action = (query.get("action") or "").strip().lower()
-        day = _day((query.get("on_or_before") or "").strip())
-        cursor = _when((query.get("before") or "").strip())
+        day = optional_date(query.get("on_or_before"))
+        cursor = optional_datetime(query.get("before"))
         if day is not None:
             end_of_day = datetime.combine(day + timedelta(days=1), time.min, tzinfo=UTC)
             cursor = min(cursor, end_of_day) if cursor is not None else end_of_day
