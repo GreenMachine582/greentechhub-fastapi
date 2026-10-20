@@ -70,6 +70,8 @@ greentechhub_fastapi.admin.
 register_users likewise; the store-backed AccountLoginViews,
 AccountPasswordResetViews, AccountVerificationViews, account_profile,
 account_password_change and account_address live in greentechhub_fastapi.users.
+
+register_scim likewise; ScimViews lives in greentechhub_fastapi.scim.
 """
 
 from greentechhub_fastapi.exceptions import register_api_error_handlers, register_exception_handlers
@@ -89,6 +91,7 @@ from greentechhub_fastapi.registration import (
     register_logging,
     register_notifications,
     register_permissions,
+    register_scim,
     register_settings,
     register_users,
 )
@@ -111,6 +114,7 @@ __all__ = [
     "register_logging",
     "register_notifications",
     "register_permissions",
+    "register_scim",
     "register_settings",
     "register_users",
 ]

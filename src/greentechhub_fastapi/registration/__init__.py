@@ -13,6 +13,7 @@ from greentechhub_fastapi.registration.health import register_health
 from greentechhub_fastapi.registration.logging import register_logging
 from greentechhub_fastapi.registration.notifications import register_notifications
 from greentechhub_fastapi.registration.permissions import register_permissions
+from greentechhub_fastapi.registration.scim import register_scim
 from greentechhub_fastapi.registration.settings import register_settings
 from greentechhub_fastapi.registration.users import register_users
 
@@ -32,6 +33,7 @@ __all__ = [
     "register_logging",
     "register_notifications",
     "register_permissions",
+    "register_scim",
     "register_settings",
     "register_users",
 ]
