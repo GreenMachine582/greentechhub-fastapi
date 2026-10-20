@@ -27,8 +27,7 @@ PyFinBot ready (M6) → v1.0. M1, M2, M4 (ui v0.19) and M5 shipped; see the CHAN
 ### User accounts — in progress
 Core's `users` module (one internal key per person, linked sign-ins, provisioning and IdP field sync) is adopted
 here through `register_users` and the store-backed views in `greentechhub_fastapi.users`.
-- [ ] Inbound SCIM 2.0 (`register_scim`): Authentik pushes user create, update and deactivate events, so changes
-  made at the IdP reach a service without a sign-in or a reconciliation job
+- SCIM Groups → role grants, if a service ever wants roles pushed rather than read from `ROLE_GROUPS`
 - [ ] `AUTH_ADAPTER=oidc`: authorization code + PKCE against Authentik's discovery URL, for services not behind the
   outpost. It resolves through the same `resolve_account` with `provider="oidc:<name>"`
 

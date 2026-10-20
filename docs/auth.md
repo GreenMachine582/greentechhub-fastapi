@@ -471,6 +471,23 @@ request.
 app go through the store. A sign-in through the IdP syncs the IdP's fields. Changes made at the IdP while they're
 away reach the app through SCIM push (Authentik's SCIM provider), which retries and periodically re-syncs by itself.
 
+**SCIM** (`register_scim(app, token=..., provider="authentik", prefix="/scim/v2")`, needs `register_users`): an inbound
+SCIM 2.0 Users endpoint for Authentik's SCIM provider.
+
+- **Endpoints:**
+  - `ServiceProviderConfig`, `ResourceTypes` and `Schemas`.
+  - `GET /Users`, with `filter=userName eq "…"` or `externalId eq "…"` plus `startIndex`/`count`.
+  - `POST /Users`, `GET`/`PUT`/`PATCH`/`DELETE /Users/{id}`.
+- **Auth:** every request needs `Authorization: Bearer <token>`, compared in constant time.
+- **`externalId`** must be the Authentik user's `uid`, the same value the outpost sends as `X-authentik-uid`. A
+  pushed account and a forward-auth sign-in then share one link.
+- **Pushed data:**
+  - Addresses count as verified.
+  - `DELETE` and `active: false` deactivate the account, which signs it out at once.
+  - Each change is audited.
+- **Groups:** they aren't synced, and `/Groups` answers 501. Set the SCIM provider to users only; roles come from
+  `ROLE_GROUPS`.
+
 **Social sign-in:** add Google, GitHub and Apple to Authentik as sources. The app only ever sees
 `provider="authentik"`, so every gth service gets those sign-ins with no code of its own.
 
