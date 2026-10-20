@@ -518,7 +518,8 @@ register_email(app, settings, sender=SettingsEmailSender(service), base_url="htt
 - `InMemoryEmailSender()` keeps an `outbox` instead of sending, for development and tests.
 - `address_for(subject)` is an async lookup for someone's address when there's only a subject, or an `Identity`
   without an email, e.g. from your users table or the profile's email. `recipient_address(app, recipient)`
-  (`greentechhub_fastapi.email`) gives the answer: the `Identity.email`, else `address_for`, else `None`.
+  (`greentechhub_fastapi.email`) gives the answer: `address_for` when you gave one (the live address), else the
+  `Identity.email`, else `None`.
 - `base_url` makes relative links in emails absolute (`absolute_url(app, "/stocks")`).
 - `send_email(app, message)` sends a core `EmailMessage` (`new_email(to, subject, text, html=None)`), for your own
   routes and jobs. `get_email_sender` is the same sender as a `Depends()`. Errors propagate: core's

@@ -638,12 +638,14 @@ class SettingsViews:
                 request, self._profile_section(profile, errors), status_code=422
             )
         message = "Profile saved"
-        changed = profile.email and (
-            profile.email.casefold() != before.email.strip().casefold()
+        # The confirmation goes to the address as saved (a store may
+        # normalise it, e.g. lowercase), not as typed.
+        saved = await self.load_profile(user)
+        changed = saved.email and (
+            saved.email.casefold() != before.email.strip().casefold()
         )
         if changed and self._verification is not None:
-            message = await self._confirm_email(request, user, profile.email)
-        saved = await self.load_profile(user)
+            message = await self._confirm_email(request, user, saved.email)
         return self._render_section(
             request, self._profile_section(saved),
             headers={"HX-Trigger": _toast_trigger(message, {})},
