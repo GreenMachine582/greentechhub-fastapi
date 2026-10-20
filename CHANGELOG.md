@@ -5,6 +5,22 @@ version). From v0.8.0 on, entries are written by [release-please](https://github
 from conventional commits; the same notes are published as
 [GitHub Releases](https://github.com/GreenMachine582/greentechhub-fastapi/releases).
 
+## [0.18.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.17.0...v0.18.0) (2026-10-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* **scim:** recipient_address now asks register_email's address_for first and only falls back to the Identity's email without one, so a notice goes to the live address rather than one frozen in a token.
+* **auth:** recipient_address now asks register_email's address_for first and only falls back to the Identity's email without one, so a notice goes to the live address rather than one frozen in a token.
+
+### Features
+
+* **auth:** user accounts through register_users ([#95](https://github.com/GreenMachine582/greentechhub-fastapi/issues/95)) ([ac2bd3e](https://github.com/GreenMachine582/greentechhub-fastapi/commit/ac2bd3e6981125c8057c71da2974d44b20b1ec2f))
+* **query:** get_owned_or_404 takes loader options ([#90](https://github.com/GreenMachine582/greentechhub-fastapi/issues/90)) ([eca53ec](https://github.com/GreenMachine582/greentechhub-fastapi/commit/eca53ec0194b05890e181d235584ed0b465dd870))
+* **query:** lenient query parsers ([#91](https://github.com/GreenMachine582/greentechhub-fastapi/issues/91)) ([de0323d](https://github.com/GreenMachine582/greentechhub-fastapi/commit/de0323db2eb1a45f53972524f87b67d87fc50b60))
+* **scim:** inbound SCIM 2.0 users ([#96](https://github.com/GreenMachine582/greentechhub-fastapi/issues/96)) ([f42b202](https://github.com/GreenMachine582/greentechhub-fastapi/commit/f42b2022b38986bf2e9f7dcd42051ec4ab9e5057))
+* **uploads:** size-capped upload reader ([#92](https://github.com/GreenMachine582/greentechhub-fastapi/issues/92)) ([f31b618](https://github.com/GreenMachine582/greentechhub-fastapi/commit/f31b618d8298cc49131e97d1284b947e300299ec))
+
 ## [0.17.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.16.0...v0.17.0) (2026-10-15)
 
 
