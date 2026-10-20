@@ -6,8 +6,9 @@ greentechhub-core's EmailSender.
   Errors propagate: EmailDeliveryError / EmailNotConfiguredError are core
   ApplicationErrors, which the exception handlers answer 502 / 503.
 - get_email_sender: the same sender as a Depends() helper.
-- recipient_address: where to email a person — their Identity's email,
-  else the service's `address_for` lookup.
+- recipient_address: where to email a person — the service's
+  `address_for` lookup when it has one (the live address), else their
+  Identity's email.
 
 notifications.notify uses these for the "email" delivery channel.
 """
@@ -64,16 +65,21 @@ async def send_email(app: Any, message: EmailMessage) -> None:
 
 
 async def recipient_address(app: Any, recipient: Identity | str) -> str | None:
-    """Where to email `recipient` (an Identity or a subject): the Identity's
-    email when it has one, else register_email's `address_for(subject)`,
-    else None."""
+    """Where to email `recipient` (an Identity or a subject):
+    register_email's `address_for(subject)` when the service gave one, else
+    the Identity's email, else None.
+
+    `address_for` comes first because it reads the current address: an
+    Identity's email is whatever its session token carried when it was
+    issued, which may predate a profile change. When `address_for` returns
+    None for someone, that answer stands (e.g. an unconfirmed address)."""
+    address_for = get_email_config(app).address_for
+    if address_for is not None:
+        subject = recipient if isinstance(recipient, str) else recipient.subject
+        return await address_for(subject) or None
     if isinstance(recipient, Identity) and recipient.email:
         return recipient.email
-    address_for = get_email_config(app).address_for
-    if address_for is None:
-        return None
-    subject = recipient if isinstance(recipient, str) else recipient.subject
-    return await address_for(subject) or None
+    return None
 
 
 def absolute_url(app: Any, url: str) -> str:

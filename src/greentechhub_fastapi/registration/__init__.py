@@ -14,6 +14,7 @@ from greentechhub_fastapi.registration.logging import register_logging
 from greentechhub_fastapi.registration.notifications import register_notifications
 from greentechhub_fastapi.registration.permissions import register_permissions
 from greentechhub_fastapi.registration.settings import register_settings
+from greentechhub_fastapi.registration.users import register_users
 
 __all__ = [
     "register_admin",
@@ -32,4 +33,5 @@ __all__ = [
     "register_notifications",
     "register_permissions",
     "register_settings",
+    "register_users",
 ]

@@ -24,6 +24,14 @@ PyFinBot ready (M6) → v1.0. M1, M2, M4 (ui v0.19) and M5 shipped; see the CHAN
   - [ ] Replace watchlist's `_watchlist_page_params`/`_next_url` with `query.page_params`/`query.next_page_url`
     (v0.7)
 
+### User accounts — in progress
+Core's `users` module (one internal key per person, linked sign-ins, provisioning and IdP field sync) is adopted
+here through `register_users` and the store-backed views in `greentechhub_fastapi.users`.
+- [ ] Inbound SCIM 2.0 (`register_scim`): Authentik pushes user create, update and deactivate events, so changes
+  made at the IdP reach a service without a sign-in or a reconciliation job
+- [ ] `AUTH_ADAPTER=oidc`: authorization code + PKCE against Authentik's discovery URL, for services not behind the
+  outpost. It resolves through the same `resolve_account` with `provider="oidc:<name>"`
+
 ### M6 PyFinBot ready — shipped
 This package's share shipped in v0.17.0 (see the CHANGELOG): `register_csp`, `register_admin`, personal API tokens,
 `register_error_pages`, `get_owned_or_404` and `require_cookie_csrf`. PyFinBot's `todo.md` holds the adoption PRs.
@@ -31,8 +39,8 @@ This package's share shipped in v0.17.0 (see the CHANGELOG): `register_csp`, `re
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
 one `register_*` call. Who wants it is noted where known.
-- Users admin — list, search, disable, force a password reset, assign roles inline (builds on `RoleAdminViews`
-  and `RegisterViews`)
+- Users admin — list, search, disable, force a password reset, assign roles inline (builds on `RoleAdminViews`,
+  and on core's `UserStore` through `register_users`)
 - System status page — core health checks as a page (status, last checked, response time), admin-only with an
   optional public summary
 - Feature flags page — see and toggle flags per app, user or group (core's settings-backed provider)

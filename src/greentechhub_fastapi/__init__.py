@@ -66,6 +66,10 @@ greentechhub_fastapi.exceptions.
 
 register_admin likewise; admin_nav_item and AdminView live in
 greentechhub_fastapi.admin.
+
+register_users likewise; the store-backed AccountLoginViews,
+AccountPasswordResetViews, AccountVerificationViews, account_profile,
+account_password_change and account_address live in greentechhub_fastapi.users.
 """
 
 from greentechhub_fastapi.exceptions import register_api_error_handlers, register_exception_handlers
@@ -86,6 +90,7 @@ from greentechhub_fastapi.registration import (
     register_notifications,
     register_permissions,
     register_settings,
+    register_users,
 )
 
 __all__ = [
@@ -107,4 +112,5 @@ __all__ = [
     "register_notifications",
     "register_permissions",
     "register_settings",
+    "register_users",
 ]
