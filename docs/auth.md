@@ -433,6 +433,64 @@ router = APIRouter(dependencies=[Depends(require_csrf)])  # your own htmx routes
   - The session cookie's `SameSite=Lax` already keeps other sites' POSTs from carrying it, so this is defence in
     depth.
 
+## User accounts
+
+Once a service calls `register_users(app, store)` with greentechhub-core's `UserStore` (`SQLAlchemyUserStore` over
+`gth_users`/`gth_user_identities`; see core's docs/users.md), `register_auth` resolves every caller to their account.
+Routes then receive the account's canonical `Identity`, whose `subject` is the account id, whichever adapter signed
+them in:
+
+- **`forward_auth`:**
+  - The first request from an Authentik user provisions an account and links it to their Authentik `uid`.
+  - Later requests copy the fields the IdP owns (email and display name by default) when they change.
+  - Writes are throttled to one per `touch_interval`.
+  - Provisioning, linking and syncing are recorded in the audit log (`user.provisioned`, `user.linked`,
+    `user.synced`) when `register_audit` ran.
+- **`local` (session cookie, bearer JWT, personal API token):** the token's subject is looked up. Profile fields
+  come from the account on every request, not from whatever the token carried when it was issued.
+- **Deactivating an account** (`store.update(id, {"active": False})`) signs it out on its next request, for
+  sessions and personal API tokens alike.
+
+Without `register_users`, nothing changes: the adapter's `Identity` passes through. The resolution is cached per
+request.
+
+`greentechhub_fastapi.users` fills in the account lookups the views otherwise leave abstract:
+
+| Helper | Replaces |
+|---|---|
+| `AccountLoginViews(users=store, require_verified=False, ...)` | `LoginViews.authenticate` (core's `authenticate`). `require_verified` refuses an unconfirmed email. |
+| `AccountPasswordResetViews(users=store, ...)` | `find_account` (by user ID or email; active accounts with an address) and `set_password` |
+| `AccountVerificationViews(users=store, ...)` | `mark_verified` and `find_unverified` |
+| `account_profile(store, policy=..., idp_label=...)` | `SettingsViews`' `load_profile`/`save_profile`. For someone signed in through an IdP, the IdP-owned fields are locked ("Managed by Authentik"). A changed email is saved unconfirmed, and a taken one is a field error. |
+| `account_password_change(store)` | `SettingsViews`' `change_password` |
+| `account_address(store, verified_only=True)` | `register_email`'s `address_for`: only confirmed addresses of active accounts |
+
+`recipient_address` asks `address_for` first when the service gave one, so notices go to the live address.
+
+**Keeping profiles in step:** this only needs the person's own actions, with no polling. Changes they make in the
+app go through the store. A sign-in through the IdP syncs the IdP's fields. Changes made at the IdP while they're
+away reach the app through SCIM push (Authentik's SCIM provider), which retries and periodically re-syncs by itself.
+
+**SCIM** (`register_scim(app, token=..., provider="authentik", prefix="/scim/v2")`, needs `register_users`): an inbound
+SCIM 2.0 Users endpoint for Authentik's SCIM provider.
+
+- **Endpoints:**
+  - `ServiceProviderConfig`, `ResourceTypes` and `Schemas`.
+  - `GET /Users`, with `filter=userName eq "…"` or `externalId eq "…"` plus `startIndex`/`count`.
+  - `POST /Users`, `GET`/`PUT`/`PATCH`/`DELETE /Users/{id}`.
+- **Auth:** every request needs `Authorization: Bearer <token>`, compared in constant time.
+- **`externalId`** must be the Authentik user's `uid`, the same value the outpost sends as `X-authentik-uid`. A
+  pushed account and a forward-auth sign-in then share one link.
+- **Pushed data:**
+  - Addresses count as verified.
+  - `DELETE` and `active: false` deactivate the account, which signs it out at once.
+  - Each change is audited.
+- **Groups:** they aren't synced, and `/Groups` answers 501. Set the SCIM provider to users only; roles come from
+  `ROLE_GROUPS`.
+
+**Social sign-in:** add Google, GitHub and Apple to Authentik as sources. The app only ever sees
+`provider="authentik"`, so every gth service gets those sign-ins with no code of its own.
+
 ## Requiring a login on page routes
 
 `get_current_user` resolves to `None` for anonymous callers, and `dependencies.get_current_identity` turns that into a 401 JSON envelope — right for APIs, wrong for browser pages. For server-rendered routes use `dependencies.require_page_identity(login_url="/login")`:

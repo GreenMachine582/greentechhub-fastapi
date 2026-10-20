@@ -83,7 +83,7 @@ class _Subject:
 async def notify(
     app: Any,
     recipient: Identity | str,
-    payload: dict[str, Any],
+    payload: dict[str, Any] | str,
     *,
     category: str = "general",
 ) -> Notification | None:
@@ -92,8 +92,9 @@ async def notify(
     notification centre and/or email it. Returns the stored Notification, or
     None when it wasn't stored (the person chose email only, or off).
 
-    `payload` is a greentechhub-ui toast() detail, or the whole
-    {"showToast": ...} value toast() returns. When register_settings has
+    `payload` is what greentechhub-ui's toast() returns (its HX-Trigger JSON
+    text, {"showToast": ...}), that value decoded, or just its detail dict
+    ({"message", "kind", "title", ...}). When register_settings has
     core's notification_preferences for `category`, the person's choice
     decides the channels; otherwise it's in-app only.
 
@@ -105,6 +106,8 @@ async def notify(
     break the in-app notice or the caller.
     """
     store = get_notifications_config(app).store
+    if isinstance(payload, str):
+        payload = json.loads(payload)
     subject = recipient if isinstance(recipient, str) else recipient.subject
     # Imported here: greentechhub_fastapi.settings imports auth.dependency,
     # whose package __init__ imports the auth views.

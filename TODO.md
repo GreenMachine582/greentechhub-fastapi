@@ -13,7 +13,7 @@ local GTH mode (`scripts/use-local-gth.sh`, see [CONTRIBUTING.md](CONTRIBUTING.m
 ## 🗺️ Milestones
 
 Cross-repo order (with greentechhub-core and greentechhub-ui): consumers live (M3) → ui breaking release (M4) →
-PyFinBot ready (M6) → v1.0. M1, M2 and M5 shipped; see the CHANGELOG.
+PyFinBot ready (M6) → v1.0. M1, M2, M4 (ui v0.19) and M5 shipped; see the CHANGELOG.
 
 ### M3 Consumers live — in progress
 - PyFinBot runs on this package throughout. Left on its side: the `forward_auth` switch once Authentik is live. This
@@ -24,20 +24,22 @@ PyFinBot ready (M6) → v1.0. M1, M2 and M5 shipped; see the CHANGELOG.
   - [ ] Replace watchlist's `_watchlist_page_params`/`_next_url` with `query.page_params`/`query.next_page_url`
     (v0.7)
 
-### M4 ui breaking release — owned by greentechhub-ui
-ui drops its CDN-URL defaults, so services must mount `greentechhub_ui.static_dirs()`. This package's share:
-- [ ] When it lands, check `mount_static_dirs` in docs/registration.md and the README example still match what ui
-  requires, and that the playground mounts them.
+### User accounts — in progress
+Core's `users` module (one internal key per person, linked sign-ins, provisioning and IdP field sync) is adopted
+here through `register_users` and the store-backed views in `greentechhub_fastapi.users`.
+- SCIM Groups → role grants, if a service ever wants roles pushed rather than read from `ROLE_GROUPS`
+- [ ] `AUTH_ADAPTER=oidc`: authorization code + PKCE against Authentik's discovery URL, for services not behind the
+  outpost. It resolves through the same `resolve_account` with `provider="oidc:<name>"`
 
 ### M6 PyFinBot ready — shipped
-This package's share is done (the next release's CHANGELOG lists it): `register_csp`, `register_admin`, personal API tokens,
+This package's share shipped in v0.17.0 (see the CHANGELOG): `register_csp`, `register_admin`, personal API tokens,
 `register_error_pages`, `get_owned_or_404` and `require_cookie_csrf`. PyFinBot's `todo.md` holds the adoption PRs.
 
 ### Ideas — not scheduled
 Each follows the settings/roles pattern: a core model or protocol, a `*Views` class here, a greentechhub-ui template,
 one `register_*` call. Who wants it is noted where known.
-- Users admin — list, search, disable, force a password reset, assign roles inline (builds on `RoleAdminViews`
-  and `RegisterViews`)
+- Users admin — list, search, disable, force a password reset, assign roles inline (builds on `RoleAdminViews`,
+  and on core's `UserStore` through `register_users`)
 - System status page — core health checks as a page (status, last checked, response time), admin-only with an
   optional public summary
 - Feature flags page — see and toggle flags per app, user or group (core's settings-backed provider)
@@ -70,10 +72,10 @@ one `register_*` call. Who wants it is noted where known.
 Its open items are under M3 above.
 
 ### PyFinBot
-It runs on this package throughout (auth, settings, permissions, roles, logging, health, API error handlers, query
-paging, login throttling). What's left is adopting the newer pieces, each a PR in PyFinBot's `todo.md`: the test
-fixtures, `register_audit`, CSRF on htmx forms and bearer API auth, then M6 above as it ships (its HTML error pages
-and `get_owned_or_404` included).
+It runs on this package throughout: auth (bearer and personal API tokens included), settings, permissions, roles and
+the Admin nav, audit, CSRF (pages and cookie-authenticated API calls), CSP, error pages, logging, health, API error
+handlers, query paging, login throttling and the test fixtures. What's left is adopting each release's new pieces, a
+PR each in PyFinBot's `todo.md`.
 
 ### Market Watch (planned)
 - [ ] Not started — builds on this from day one, same as PyFinBot

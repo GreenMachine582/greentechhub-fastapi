@@ -22,12 +22,19 @@ here — it's ProxyHeadersMiddleware's request.state.trusted_proxy flag (see
 middleware/proxy_headers.py and auth/forward_auth.py); register_auth never
 touches TRUSTED_PROXIES itself. Any other adapter value is a plain
 misconfiguration and raises ValueError.
+
+Either adapter's get_current_user is wrapped by auth.accounts'
+with_user_accounts, so once register_users installs a UserStore, routes get
+the caller's user account (provisioned and synced from Authentik as needed)
+rather than the adapter's raw Identity. Without register_users the wrapper
+passes the Identity through unchanged.
 """
 
 from fastapi import FastAPI
 from greentechhub_core.config import GTHBaseSettings
 from greentechhub_core.identity import AuthentikIdentityProvider, DevelopmentIdentityProvider
 
+from greentechhub_fastapi.auth.accounts import with_user_accounts
 from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.auth.forward_auth import build_forward_auth_get_current_user
 from greentechhub_fastapi.auth.local import build_local_get_current_user
@@ -49,14 +56,16 @@ def register_auth(app: FastAPI, settings: GTHBaseSettings, *, bearer: bool = Fal
     if adapter == "local":
         provider = DevelopmentIdentityProvider(secret_key=settings.secret_key)
         setattr(app.state, IDENTITY_PROVIDER_STATE_KEY, provider)
-        app.dependency_overrides[get_current_user] = build_local_get_current_user(
-            provider, bearer=bearer
+        app.dependency_overrides[get_current_user] = with_user_accounts(
+            build_local_get_current_user(provider, bearer=bearer)
         )
         return
 
     if adapter == "forward_auth":
         provider = AuthentikIdentityProvider()
-        app.dependency_overrides[get_current_user] = build_forward_auth_get_current_user(provider)
+        app.dependency_overrides[get_current_user] = with_user_accounts(
+            build_forward_auth_get_current_user(provider)
+        )
         return
 
     raise ValueError(f"Unknown AUTH_ADAPTER={adapter!r}; expected one of {_KNOWN_ADAPTERS!r}.")

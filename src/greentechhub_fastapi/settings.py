@@ -92,10 +92,20 @@ _PROFILE = "gth_settings_profile"
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Profile:
     """A user's profile as SettingsViews' Profile section edits it; an empty
-    string means not set. Where it's stored is the service's business."""
+    string means not set. Where it's stored is the service's business.
+
+    `locked` names fields the person can't change here because another
+    system owns them (an IdP behind forward-auth): they render read-only,
+    with "Managed by {managed_by}." under them, and a save keeps their
+    current value whatever the form sent. `email_verified` (None: the
+    service doesn't track it) adds "Not confirmed yet." under an
+    unconfirmed address."""
 
     display_name: str = ""
     email: str = ""
+    email_verified: bool | None = None
+    locked: frozenset[str] = frozenset()
+    managed_by: str = ""
 
 
 class ProfileError(FormErrors):
@@ -567,19 +577,27 @@ class SettingsViews:
         self, profile: Profile, errors: dict[str, list[str]] | None = None
     ) -> dict[str, Any]:
         """The Profile section: two plain str fields (duck-typed settings, so
-        greentechhub-ui's settings templates render them as text inputs)."""
+        greentechhub-ui's settings templates render them as text inputs).
+        A locked field also carries `readonly` and its help says who manages
+        it; the email field carries `input_type="email"`."""
 
-        def field(key: str, label: str, help_text: str = "") -> dict[str, Any]:
+        def field(key: str, label: str, help_text: str = "", **extra: Any) -> dict[str, Any]:
+            if key in profile.locked:
+                owner = profile.managed_by or "your identity provider"
+                help_text = f"Managed by {owner}."
+                extra["readonly"] = True
             return {"key": key, "type": "str", "label": label, "default": "",
-                    "help_text": help_text}
+                    "help_text": help_text, **extra}
 
+        unconfirmed = profile.email_verified is False and bool(profile.email)
         return {
             "id": "profile",
             "title": self.profile_title,
             "description": self.profile_description,
             "settings": [
                 field("display_name", "Display name", "Shown instead of your user ID."),
-                field("email", "Email"),
+                field("email", "Email", "Not confirmed yet." if unconfirmed else "",
+                      input_type="email"),
             ],
             "values": {"display_name": profile.display_name, "email": profile.email},
             "errors": errors,
@@ -599,16 +617,18 @@ class SettingsViews:
 
     async def _save_profile_section(self, request: Request, user: Identity):
         assert self._save_profile is not None  # the route is only mounted with the hooks
+        assert self.load_profile is not None
         form = await request.form()
-        profile = Profile(
-            display_name=str(form.get("display_name") or "").strip(),
-            email=str(form.get("email") or "").strip(),
-        )
+        before = await self.load_profile(user)
+        submitted = {
+            key: getattr(before, key) if key in before.locked
+            else str(form.get(key) or "").strip()
+            for key in ("display_name", "email")
+        }
+        profile = Profile(**submitted, email_verified=before.email_verified,
+                          locked=before.locked, managed_by=before.managed_by)
         errors = self._check_profile(profile)
-        before = None
         if not errors:
-            if self._verification is not None and self.load_profile is not None:
-                before = await self.load_profile(user)
             try:
                 await self._save_profile(user, profile)
             except ProfileError as exc:
@@ -618,13 +638,16 @@ class SettingsViews:
                 request, self._profile_section(profile, errors), status_code=422
             )
         message = "Profile saved"
-        changed = before is not None and profile.email and (
-            profile.email.casefold() != before.email.strip().casefold()
+        # The confirmation goes to the address as saved (a store may
+        # normalise it, e.g. lowercase), not as typed.
+        saved = await self.load_profile(user)
+        changed = saved.email and (
+            saved.email.casefold() != before.email.strip().casefold()
         )
         if changed and self._verification is not None:
-            message = await self._confirm_email(request, user, profile.email)
+            message = await self._confirm_email(request, user, saved.email)
         return self._render_section(
-            request, self._profile_section(profile),
+            request, self._profile_section(saved),
             headers={"HX-Trigger": _toast_trigger(message, {})},
         )
 

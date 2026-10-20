@@ -84,10 +84,11 @@ def test_get_email_sender_in_a_route(role_settings):  # noqa: F811
     assert asyncio.run(go()).json() == {"same": True}
 
 
-def test_the_identitys_email_comes_first_then_address_for(role_settings):  # noqa: F811
+def test_address_for_comes_first_then_the_identitys_email(role_settings):  # noqa: F811
     app, _, _ = _app(role_settings)
     assert asyncio.run(recipient_address(app, _identity("bob", "bob@work.example"))) == (
-        "bob@work.example")
+        "bob@example.com")
+    assert asyncio.run(recipient_address(app, _identity("nobody", "old@example.com"))) is None
     assert asyncio.run(recipient_address(app, _identity("bob"))) == "bob@example.com"
     assert asyncio.run(recipient_address(app, "bob")) == "bob@example.com"
     assert asyncio.run(recipient_address(app, "nobody")) is None

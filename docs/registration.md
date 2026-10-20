@@ -94,8 +94,8 @@ register_csp(app, frame_src=[settings.GRAFANA_URL])  # e.g. for a gth_embed_card
   `{nonce}` where the nonce goes), for example to add `'unsafe-eval'`.
 - A route that sets its own `Content-Security-Policy` keeps it.
 - Scripts need `'self'` or the nonce, so templates mustn't use the htmx features that `eval`: `hx-on`, `hx-vars`,
-  `js:` in `hx-vals`, and `[…]` filters in `hx-trigger`. Mount ui's `static_dirs()` too, since the CDN defaults are
-  off-origin.
+  `js:` in `hx-vals`, and `[…]` filters in `hx-trigger`. ui serves its assets from `static_dirs()`, which every
+  service mounts anyway (required since ui v0.19, which has no CDN fallback), so they're all `'self'`.
 
 ## Permissions
 
@@ -187,10 +187,11 @@ from greentechhub_core.settings import JsonFileSettingsStore, SettingsRegistry
 from greentechhub_core.settings.builtins import USER_PREFERENCES
 from greentechhub_fastapi import register_auth, register_permissions, register_settings
 from greentechhub_fastapi.settings import SettingsViews, settings_context
-from greentechhub_fastapi.templating import ui_context
+from greentechhub_fastapi.templating import mount_static_dirs, ui_context
 
 templates = Jinja2Templates(directory="templates", context_processors=[ui_context, settings_context])
 greentechhub_ui.install(templates.env, service_name="…", nav_items=[…])
+mount_static_dirs(app, greentechhub_ui.static_dirs())  # ui's assets; required since ui v0.19 (no CDN fallback)
 
 register_auth(app, settings)
 register_permissions(app, settings, roles=[ADMIN])        # ROLE_BOOTSTRAP=alice=admin for the first admin
@@ -391,8 +392,8 @@ await notify(app, user, toast("Sync finished", kind="success"), category="sync")
 ```
 
 - `notify(app, recipient, payload, *, category="general")` takes an `Identity` or a bare subject (for a job with no
-  `Identity`) and a greentechhub-ui `toast()` payload, either its detail or the whole `{"showToast": ...}`. It stores
-  the notice and returns it.
+  `Identity`) and a greentechhub-ui `toast()` payload: what `toast()` returns (its `HX-Trigger` JSON text), that
+  value decoded (`{"showToast": ...}`), or just its detail dict. It stores the notice and returns it.
 - **Delivery preferences:** register core's `notification_preferences({"sync": "Sync results"})` settings through
   `register_settings` and each person picks, per category, in the app, by email, both or off, on the settings page.
   `notify` stores nothing and returns `None` when their choice leaves out the app. A category without a preference
@@ -418,7 +419,7 @@ re-fetches the badge from `notifications_nav_item()`. A form without htmx can po
 redirected there (303) instead; anything else is ignored, so it's never an open redirect.
 
 **Templates.** They default to greentechhub-ui's notification centre (`notifications_page.html`,
-`notifications_panel.html`, `notification_badge.html`, still to come there); set `page_template` / `panel_template` /
+`notifications_panel.html`, `notification_badge.html`); set `page_template` / `panel_template` /
 `badge_template` to use your own. The page and panel get `page_title`, `notifications`, `unread_count`,
 `unread_only`, `page_url` and `mark_all_url`. Each notification is a dict of its fields (`id`, `message`, `kind`,
 `title`, `icon`, `action_label`, `action_url`, `category`, `created_at`, `read_at`) plus `read`, `read_url` and
@@ -517,7 +518,8 @@ register_email(app, settings, sender=SettingsEmailSender(service), base_url="htt
 - `InMemoryEmailSender()` keeps an `outbox` instead of sending, for development and tests.
 - `address_for(subject)` is an async lookup for someone's address when there's only a subject, or an `Identity`
   without an email, e.g. from your users table or the profile's email. `recipient_address(app, recipient)`
-  (`greentechhub_fastapi.email`) gives the answer: the `Identity.email`, else `address_for`, else `None`.
+  (`greentechhub_fastapi.email`) gives the answer: `address_for` when you gave one (the live address), else the
+  `Identity.email`, else `None`.
 - `base_url` makes relative links in emails absolute (`absolute_url(app, "/stocks")`).
 - `send_email(app, message)` sends a core `EmailMessage` (`new_email(to, subject, text, html=None)`), for your own
   routes and jobs. `get_email_sender` is the same sender as a `Depends()`. Errors propagate: core's
