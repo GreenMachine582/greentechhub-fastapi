@@ -72,10 +72,12 @@ one `register_*` call. Who wants it is noted where known.
 Its open items are under M3 above.
 
 ### PyFinBot
-It runs on this package throughout: auth (bearer and personal API tokens included), settings, permissions, roles and
-the Admin nav, audit, CSRF (pages and cookie-authenticated API calls), CSP, error pages, logging, health, API error
-handlers, query paging, login throttling and the test fixtures. What's left is adopting each release's new pieces, a
-PR each in PyFinBot's `todo.md`.
+It runs on this package (v0.18) throughout: auth (bearer and personal API tokens included), user accounts
+(`register_users`) and SCIM, settings, permissions, roles and the Admin nav, audit, CSRF (pages and
+cookie-authenticated API calls), CSP, error pages, logging, health, API error handlers, query paging and the lenient
+query parsers, `get_owned_or_404` (with `options=`), `uploads.read_upload`, login throttling and the test fixtures
+(PyFinBot #114, #115, #117, #118). What's left is adopting each release's new pieces, a PR each in PyFinBot's
+`todo.md`.
 
 ### Market Watch (planned)
 - [ ] Not started — builds on this from day one, same as PyFinBot
