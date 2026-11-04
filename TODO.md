@@ -35,8 +35,6 @@ here through `register_users` and the store-backed views in `greentechhub_fastap
 For a local tool with one user and no sign-in that scans folders and runs long jobs.
 - [ ] `AUTH_ADAPTER=single_user`: every request is one fixed local identity, so notifications work without
   sign-in; `notify(app, None, ...)` reaches that user from code with no request
-- [ ] `register_jobs` and `JobViews` over core's `JobRunner`: progress polling, pause/resume/cancel, the result,
-  an audit entry (and optionally a notification) when a job finishes
 - [ ] `FolderPickerViews` over core's folder listing, for greentechhub-ui's folder picker
 
 ### M6 PyFinBot ready — shipped
