@@ -7,12 +7,16 @@ admin page that reads it.
   ran, so this package's views call it unconditionally and a service that
   never registers audit pays nothing. A store that fails is logged, not
   raised: the action it records has already happened.
+- record_audit(app, action, ...): the same with no request at hand (a
+  background job): the actor is whoever the caller says, None for the system.
 - get_audit_store(request): the store register_audit put on the app, or None.
 - AuditViews: GET {url}, newest entries first, filtered by actor, action
   (exact, or a prefix ending in ".") and an "on or before" date, paged back
   with a `before` cursor. Gated on a permission the service supplies, like
-  RoleAdminViews. Renders greentechhub-ui's audit_page.html by default,
-  passing data only.
+  RoleAdminViews, or with permission=None on a signed-in identity alone (an
+  activity page, or an app on AUTH_ADAPTER=single_user). Renders
+  greentechhub-ui's audit_page.html by default (activity_page.html is the
+  timeline version), passing data only.
 
 The views here record their own events: auth.signed_in, auth.sign_in_failed
 and auth.locked_out (LoginViews; locked_out is both the failure that trips
@@ -34,6 +38,7 @@ from fastapi.templating import Jinja2Templates
 from greentechhub_core.audit import AuditEntry, AuditStore, new_entry
 from greentechhub_core.identity import Identity
 
+from greentechhub_fastapi.dependencies.identity import require_page_identity
 from greentechhub_fastapi.permissions import require_page_permission
 from greentechhub_fastapi.query.lenient import optional_date, optional_datetime
 
@@ -52,8 +57,36 @@ class AuditConfig:
 
 def get_audit_store(request: Request) -> AuditStore | None:
     """The AuditStore register_audit installed, or None."""
-    config = getattr(request.app.state, AUDIT_STATE_KEY, None)
+    return _app_audit_store(request.app)
+
+
+def _app_audit_store(app: Any) -> AuditStore | None:
+    config = getattr(app.state, AUDIT_STATE_KEY, None)
     return config.store if config is not None else None
+
+
+async def record_audit(
+    app: Any,
+    action: str,
+    *,
+    actor: str | None = None,
+    target: tuple[str, Any] | None = None,
+    summary: str = "",
+    details: Mapping[str, Any] | None = None,
+) -> AuditEntry | None:
+    """audit() for code with no request (a background job, a startup task):
+    record `action` with `actor` (None for the system) and return the
+    entry, or None when audit isn't registered or the store failed."""
+    store = _app_audit_store(app)
+    if store is None:
+        return None
+    entry = new_entry(action, actor=actor, target=target, summary=summary, details=details)
+    try:
+        await store.record(entry)
+    except Exception:
+        logger.exception("audit: recording %s failed", action)
+        return None
+    return entry
 
 
 async def audit(
@@ -70,8 +103,7 @@ async def audit(
     to the signed-in user's subject (None when nobody is); pass it, or None
     for the system, to say otherwise. `target` is (type, id); `details` is
     scrubbed of credential-like keys by core."""
-    store = get_audit_store(request)
-    if store is None:
+    if get_audit_store(request) is None:
         return None
     if actor is _UNSET:
         # Imported here: settings imports auth, whose views import this module.
@@ -79,19 +111,19 @@ async def audit(
 
         user = await _resolve_user(request)
         actor = user.subject if user is not None else None
-    entry = new_entry(action, actor=actor, target=target, summary=summary, details=details)
-    try:
-        await store.record(entry)
-    except Exception:
-        logger.exception("audit: recording %s failed", action)
-        return None
-    return entry
+    return await record_audit(request.app, action, actor=actor, target=target,
+                              summary=summary, details=details)
 
 
 class AuditViews:
     """The audit log admin page. Mount it like RoleAdminViews, or pass it to
     register_audit(..., views=):
     `AuditViews(templates=templates, permission="audit.view")`.
+
+    `permission=None` drops the permission gate: any signed-in identity
+    sees the log (on AUTH_ADAPTER=single_user, everyone who can reach the
+    app), and register_permissions isn't needed. Set page_template to
+    "activity_page.html" for greentechhub-ui's timeline version.
 
     GET {url}?actor=&action=&on_or_before=YYYY-MM-DD&before=<cursor>: up to
     `page_size` entries, newest first. `before` (an entry's ISO time) pages
@@ -106,10 +138,13 @@ class AuditViews:
     icon: str = "journal-text"  # its entry in register_admin's nav group
     page_size: int = 50
 
-    def __init__(self, *, templates: Jinja2Templates, permission: str) -> None:
+    def __init__(self, *, templates: Jinja2Templates, permission: str | None) -> None:
         self._templates = templates
         self.permission = permission
-        self._guard = require_page_permission(permission, self.login_url)
+        if permission is None:
+            self._guard = require_page_identity(self.login_url)
+        else:
+            self._guard = require_page_permission(permission, self.login_url)
 
     def router(self) -> APIRouter:
         router = APIRouter()
