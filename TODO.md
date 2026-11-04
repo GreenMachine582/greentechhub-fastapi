@@ -33,8 +33,6 @@ here through `register_users` and the store-backed views in `greentechhub_fastap
 
 ### Local single-user apps
 For a local tool with one user and no sign-in that scans folders and runs long jobs.
-- [ ] `AUTH_ADAPTER=single_user`: every request is one fixed local identity, so notifications work without
-  sign-in; `notify(app, None, ...)` reaches that user from code with no request
 - [ ] `AuditViews(permission=None)` for an activity page without a permission gate, and `record_audit` for code
   with no request
 - [ ] `register_jobs` and `JobViews` over core's `JobRunner`: progress polling, pause/resume/cancel, the result,
