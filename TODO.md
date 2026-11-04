@@ -31,6 +31,16 @@ here through `register_users` and the store-backed views in `greentechhub_fastap
 - [ ] `AUTH_ADAPTER=oidc`: authorization code + PKCE against Authentik's discovery URL, for services not behind the
   outpost. It resolves through the same `resolve_account` with `provider="oidc:<name>"`
 
+### Local single-user apps
+For a local tool with one user and no sign-in that scans folders and runs long jobs.
+- [ ] `AUTH_ADAPTER=single_user`: every request is one fixed local identity, so notifications work without
+  sign-in; `notify(app, None, ...)` reaches that user from code with no request
+- [ ] `AuditViews(permission=None)` for an activity page without a permission gate, and `record_audit` for code
+  with no request
+- [ ] `register_jobs` and `JobViews` over core's `JobRunner`: progress polling, pause/resume/cancel, the result,
+  an audit entry (and optionally a notification) when a job finishes
+- [ ] `FolderPickerViews` over core's folder listing, for greentechhub-ui's folder picker
+
 ### M6 PyFinBot ready — shipped
 This package's share shipped in v0.17.0 (see the CHANGELOG): `register_csp`, `register_admin`, personal API tokens,
 `register_error_pages`, `get_owned_or_404` and `require_cookie_csrf`. PyFinBot's `todo.md` holds the adoption PRs.
