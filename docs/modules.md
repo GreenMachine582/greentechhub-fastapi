@@ -79,6 +79,34 @@ async def import_file(file: UploadFile = File(...)):
   envelope. A page route can catch it and render its own form error instead.
 - `file` is Starlette's `UploadFile`, or anything with an async `read(size)`.
 
+## Folder picker
+
+`folders.FolderPickerViews` is the server half of greentechhub-ui's `gth_folder_picker`: the browse endpoint its
+modal loads, over greentechhub-core's `list_folders` (run in a worker thread).
+
+```python
+from greentechhub_fastapi.folders import FolderPickerViews
+
+folders = FolderPickerViews(templates=templates)            # or roots=["D:/Music"], permission="..."
+app.include_router(folders.router())
+# in a template: gth_folder_picker("library", "Library folder", browse_url="/folders", value=...)
+```
+
+- `GET /folders?path=&hidden=1&target=<input id>`. An empty `path` lists the roots (drive letters on Windows; `/`'s
+  folders elsewhere). `hidden=1` includes hidden folders. `target` is the picker input's id, passed back so
+  "Choose this folder" fills the right field. Anything but a plain id is dropped.
+- It renders `folder_browser.html` (greentechhub-ui's; set `template` for your own) with `listing` (`path`,
+  `parent`, `at_roots`, `breadcrumbs`, `entries`, `hidden_count`, `truncated`, `error`, and `error_message` from
+  `FOLDER_ERRORS`), `browse_url`, `target`, `show_hidden` and `roots_label` ("This computer").
+- A folder it can't open isn't an HTTP error: the listing carries `error` ("permission_denied", "not_found",
+  "not_a_folder", "unavailable", "outside_roots", "invalid") and the partial shows the message.
+- It needs a signed-in identity (or `permission`, when given). **Without `roots` it browses everything the server
+  process can read.** That's fine for a local single-user app
+  ([`AUTH_ADAPTER=single_user`](auth.md#single-user-mode-no-sign-in) on localhost), not for a shared server: there,
+  pass `roots`, which `..`, symlinks and junctions can't escape.
+- The picker only reads folder names. The chosen path still arrives in your form as plain text, so validate it on
+  submit (for example with `list_folders(path, roots=...)` and its `error`).
+
 ## greentechhub-ui glue (v0.8)
 
 The FastAPI half of greentechhub-ui's framework-neutral setup helpers (its `docs/contract.md`, "Setup"). This

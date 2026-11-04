@@ -39,7 +39,6 @@ For a local tool with one user and no sign-in that scans folders and runs long j
   with no request
 - [ ] `register_jobs` and `JobViews` over core's `JobRunner`: progress polling, pause/resume/cancel, the result,
   an audit entry (and optionally a notification) when a job finishes
-- [ ] `FolderPickerViews` over core's folder listing, for greentechhub-ui's folder picker
 
 ### M6 PyFinBot ready — shipped
 This package's share shipped in v0.17.0 (see the CHANGELOG): `register_csp`, `register_admin`, personal API tokens,
