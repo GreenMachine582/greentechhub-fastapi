@@ -485,6 +485,61 @@ register_audit(app, settings, store=store, views=activity)
 ```
 
 
+## Jobs
+
+`register_jobs(app, settings, views=...)` puts a greentechhub-core `JobRunner` on the app: background jobs (a folder
+scan, an import, a library build) with progress, cooperative pause/resume/cancel and a result. `JobViews` serves the
+status partial greentechhub-ui's `gth_job_status` renders, which polls itself until the job ends.
+
+```python
+from greentechhub_core.background import JobContext
+from greentechhub_fastapi import register_jobs
+from greentechhub_fastapi.jobs import JobViews, get_job_runner
+
+job_views = JobViews(templates=templates)
+register_jobs(app, settings, views=job_views, notify=True)
+
+def scan(ctx: JobContext) -> dict:                  # a plain function runs in a worker thread
+    files = list(folder.rglob("*.mp3"))
+    for n, path in enumerate(files, 1):
+        ctx.checkpoint_sync()                       # pause and cancel take effect here
+        index(path)
+        ctx.progress(n, len(files), message=path.name)
+    return {"files": len(files), "badges": [[f"{len(files)} files", "good"]]}
+
+@app.post("/scan")
+async def start_scan(request: Request, user: Identity = Depends(require_page_identity())):
+    job = await get_job_runner(request).start("scan", scan, label="Scan music",
+                                              owner=user.subject, unique=True)
+    return job_views.status_response(request, job)  # the partial: it polls from here on
+```
+
+- `register_jobs(app, settings, *, store=None, views=None, audit=True, notify=False, event_bus=None, lock=None)`
+  returns the runner. `store` defaults to core's `InMemoryJobStore`. On shutdown the jobs still running are
+  cancelled. `lock` (e.g. a `FileLock` in `settings.lock_directory()`) makes `unique=True` hold across processes.
+  Core's [jobs docs](https://github.com/GreenMachine582/greentechhub-core/blob/dev/docs/modules.md#jobs) cover
+  `JobRunner` and `JobContext`.
+- **When a job ends:** with `audit` it's recorded as `jobs.succeeded`, `jobs.failed` or `jobs.cancelled` (actor: the
+  job's owner; target `("job", id)`; details: its kind, counts and error), once [`register_audit`](#audit-log) ran.
+  With `notify=True` its owner gets a notification in the `jobs` category ("Scan music finished", or "failed: …");
+  that needs [`register_notifications`](#notifications), and a job with no owner notifies nobody.
+- `get_job_runner(request)` is the runner, for a route's `Depends`. `job_dict(job)` is a `Job` as template data.
+
+| Route | Does |
+|---|---|
+| `GET /jobs` | recent jobs, newest first (`page_size`, 50) |
+| `GET /jobs/{id}` | the job's status partial; once it's finished, an htmx request gets status 286, which stops the polling |
+| `POST /jobs/{id}/pause`, `/resume`, `/cancel` | do that, then answer the status partial |
+
+Every route needs a signed-in identity (with [`AUTH_ADAPTER=single_user`](auth.md#single-user-mode-no-sign-in), no
+sign-in at all), and `permission` when one is given. With `owner_only` (the default) a person sees and controls
+their own jobs and the system's (owner `None`); anyone else's job is a 404.
+
+**Templates.** They default to greentechhub-ui's `job_status.html` and `jobs_page.html`; set `status_template` /
+`page_template` to use your own. The partial gets `job` (a `job_dict`: its fields, `state` as a string, `active`,
+`fraction`, `percent`), `poll_url` (`None` once finished), `pause_url`, `resume_url`, `cancel_url` and `poll_every`
+(`"1s"`). The page gets `page_title`, `jobs` (each a `job_dict` plus `status_url`) and `jobs_url`.
+
 ## Admin
 
 `register_admin(app, settings, views=[...])` mounts a service's admin pages and returns their "Admin" nav group for
