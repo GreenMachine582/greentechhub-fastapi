@@ -2,7 +2,8 @@
 registration.notifications.register_notifications, over greentechhub-core's
 NotificationStore.
 
-- notify: store a notice for one person, built from a greentechhub-ui
+- notify: store a notice for one person (or, with AUTH_ADAPTER=single_user,
+  for the app's one user: recipient None), built from a greentechhub-ui
   toast() payload, honouring their delivery preference for its category
   (core's notification_preferences, when register_settings has them), and
   email it when they chose email and register_email ran.
@@ -37,6 +38,7 @@ from greentechhub_core.notifications import (
 )
 
 from greentechhub_fastapi.auth.dependency import get_current_user
+from greentechhub_fastapi.auth.single_user import single_user_identity
 from greentechhub_fastapi.dependencies.identity import require_page_identity
 from greentechhub_fastapi.email import (
     EMAIL_SEND_ERRORS,
@@ -82,14 +84,15 @@ class _Subject:
 
 async def notify(
     app: Any,
-    recipient: Identity | str,
+    recipient: Identity | str | None,
     payload: dict[str, Any] | str,
     *,
     category: str = "general",
 ) -> Notification | None:
     """Deliver a notice to `recipient` (an Identity, or a subject for code
-    with no Identity at hand, such as a scheduled job): store it for the
-    notification centre and/or email it. Returns the stored Notification, or
+    with no Identity at hand, such as a scheduled job; or None for the app's
+    single user under AUTH_ADAPTER=single_user — ValueError otherwise): store
+    it for the notification centre and/or email it. Returns the stored Notification, or
     None when it wasn't stored (the person chose email only, or off).
 
     `payload` is what greentechhub-ui's toast() returns (its HX-Trigger JSON
@@ -106,6 +109,11 @@ async def notify(
     break the in-app notice or the caller.
     """
     store = get_notifications_config(app).store
+    if recipient is None:
+        recipient = single_user_identity(app)
+        if recipient is None:
+            raise ValueError("notify(app, None, ...) needs AUTH_ADAPTER=single_user: "
+                             "pass the recipient's Identity or subject")
     if isinstance(payload, str):
         payload = json.loads(payload)
     subject = recipient if isinstance(recipient, str) else recipient.subject

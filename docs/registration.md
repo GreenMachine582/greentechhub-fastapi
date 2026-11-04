@@ -392,7 +392,8 @@ await notify(app, user, toast("Sync finished", kind="success"), category="sync")
 ```
 
 - `notify(app, recipient, payload, *, category="general")` takes an `Identity` or a bare subject (for a job with no
-  `Identity`) and a greentechhub-ui `toast()` payload: what `toast()` returns (its `HX-Trigger` JSON text), that
+  `Identity`), or `None` for the app's one user under [`AUTH_ADAPTER=single_user`](auth.md#single-user-mode-no-sign-in)
+  (`ValueError` under any other adapter), and a greentechhub-ui `toast()` payload: what `toast()` returns (its `HX-Trigger` JSON text), that
   value decoded (`{"showToast": ...}`), or just its detail dict. It stores the notice and returns it.
 - **Delivery preferences:** register core's `notification_preferences({"sync": "Sync results"})` settings through
   `register_settings` and each person picks, per category, in the app, by email, both or off, on the settings page.
@@ -405,6 +406,8 @@ await notify(app, user, toast("Sync finished", kind="success"), category="sync")
   `notify` returns the stored notification, or `None` when it wasn't stored (email only, or off).
 - Read notifications pile up: call `store.prune(before)` now and then (e.g. from a scheduled job). Unread ones are
   never pruned.
+
+With `AUTH_ADAPTER=single_user` there's no sign-in: every route below acts for the single user.
 
 | Route | Does |
 |---|---|

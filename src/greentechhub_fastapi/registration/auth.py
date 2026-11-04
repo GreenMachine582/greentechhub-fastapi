@@ -20,7 +20,12 @@ header shape — no settings hook for overriding them exists or is needed
 yet) and wired the same way "local" is. Its actual security gate is not
 here — it's ProxyHeadersMiddleware's request.state.trusted_proxy flag (see
 middleware/proxy_headers.py and auth/forward_auth.py); register_auth never
-touches TRUSTED_PROXIES itself. Any other adapter value is a plain
+touches TRUSTED_PROXIES itself.
+
+"single_user" is for a local app with one person and no sign-in: every
+request is the same fixed Identity (auth/single_user.py), not wrapped by
+with_user_accounts, so its subject stays the one notify(app, None, ...) and
+single_user_identity(app) use. Any other adapter value is a plain
 misconfiguration and raises ValueError.
 
 Either adapter's get_current_user is wrapped by auth.accounts'
@@ -38,18 +43,25 @@ from greentechhub_fastapi.auth.accounts import with_user_accounts
 from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.auth.forward_auth import build_forward_auth_get_current_user
 from greentechhub_fastapi.auth.local import build_local_get_current_user
+from greentechhub_fastapi.auth.single_user import (
+    SINGLE_USER_STATE_KEY,
+    build_single_user_get_current_user,
+    build_single_user_identity,
+)
+from greentechhub_fastapi.auth.single_user import (
+    logger as single_user_logger,
+)
 from greentechhub_fastapi.auth.tokens import BEARER_AUTH_STATE_KEY, IDENTITY_PROVIDER_STATE_KEY
 from greentechhub_fastapi.registration._settings import read_str_setting
 
-_KNOWN_ADAPTERS = ("local", "forward_auth")
+_KNOWN_ADAPTERS = ("local", "forward_auth", "single_user")
 
 
 def register_auth(app: FastAPI, settings: GTHBaseSettings, *, bearer: bool = False) -> None:
     """Install AUTH_ADAPTER's get_current_user. With the local adapter,
     `bearer=True` also accepts `Authorization: Bearer <token>` (tokens from
     auth.issue_token), so API routes use the same get_current_identity /
-    require_permission as pages; forward_auth ignores it (Authentik signs
-    people in, not tokens)."""
+    require_permission as pages; forward_auth and single_user ignore it."""
     adapter = read_str_setting(settings, "AUTH_ADAPTER", "local")
     setattr(app.state, BEARER_AUTH_STATE_KEY, adapter == "local" and bearer)
 
@@ -66,6 +78,15 @@ def register_auth(app: FastAPI, settings: GTHBaseSettings, *, bearer: bool = Fal
         app.dependency_overrides[get_current_user] = with_user_accounts(
             build_forward_auth_get_current_user(provider)
         )
+        return
+
+    if adapter == "single_user":
+        identity = build_single_user_identity(settings)
+        setattr(app.state, SINGLE_USER_STATE_KEY, identity)
+        app.dependency_overrides[get_current_user] = build_single_user_get_current_user(identity)
+        single_user_logger.warning(
+            "AUTH_ADAPTER=single_user: every request is %r with no sign-in; "
+            "only serve this app on localhost", identity.subject)
         return
 
     raise ValueError(f"Unknown AUTH_ADAPTER={adapter!r}; expected one of {_KNOWN_ADAPTERS!r}.")

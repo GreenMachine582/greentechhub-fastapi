@@ -30,7 +30,7 @@ def build_forward_auth_get_current_user(provider):
     return get_current_user
 ```
 
-`register_auth(app, settings)` (see [docs/registration.md](registration.md)) builds one of these two factories based on `settings.AUTH_ADAPTER` (`local` | `forward_auth`) and registers the result as the `get_current_user` dependency every route uses. Swapping from local dev auth to Authentik forward-auth is a **config change** (`AUTH_ADAPTER=forward_auth`), not a code change — this is the property the whole `IdentityProvider` design in `greentechhub-core` exists to guarantee. Only the `local` implementation is expected to be thrown away later; `forward_auth` is the durable path.
+`register_auth(app, settings)` (see [docs/registration.md](registration.md)) builds one of these two factories based on `settings.AUTH_ADAPTER` (`local` | `forward_auth` | [`single_user`](#single-user-mode-no-sign-in)) and registers the result as the `get_current_user` dependency every route uses. Swapping from local dev auth to Authentik forward-auth is a **config change** (`AUTH_ADAPTER=forward_auth`), not a code change — this is the property the whole `IdentityProvider` design in `greentechhub-core` exists to guarantee. Only the `local` implementation is expected to be thrown away later; `forward_auth` is the durable path.
 
 `forward_auth`'s trust decision is made in exactly one place: `ProxyHeadersMiddleware` (registered by `register_core`), from the connection's real remote address, before anything rewrites `request.client`. It exposes the result as `request.state.trusted_proxy`, and `forward_auth`'s `get_current_user` only ever reads that flag — it never calls `is_trusted_proxy` itself, so `register_core` and `register_auth` can't disagree about which proxies are trusted. **This means `register_core` must be called (with `TRUSTED_PROXIES` listing the Authentik outpost's real address) for `forward_auth` to ever resolve an identity** — a service that sets `AUTH_ADAPTER=forward_auth` but skips `register_core` gets a permanently-locked-out app (fails closed), not a security hole. Without this gate, any direct, untrusted connection could set `X-authentik-username` etc. itself and impersonate anyone. `AuthentikIdentityProvider` ships only the forward-auth header path today; OIDC token validation (`X-authentik-jwt` against the issuer's JWKS) needs a live Authentik instance and is planned for `greentechhub-core` v0.5.1.
 
@@ -432,6 +432,33 @@ router = APIRouter(dependencies=[Depends(require_csrf)])  # your own htmx routes
   - `forward_auth` isn't covered. There the session is the proxy's (Authentik's) cookie.
   - The session cookie's `SameSite=Lax` already keeps other sites' POSTs from carrying it, so this is defence in
     depth.
+
+## Single-user mode (no sign-in)
+
+A local tool with one person and no login page (a desktop-style app on `localhost`) sets
+`AUTH_ADAPTER=single_user`. Every request then resolves to one fixed `Identity`, so everything that acts for "the
+signed-in user" works unchanged: `require_page_identity` never redirects, notifications and settings are stored
+for that person, and `audit()` records them as the actor.
+
+| Setting | Default | Becomes |
+|---|---|---|
+| `SINGLE_USER_SUBJECT` | `local` | `Identity.subject`, the key notifications and settings are stored under: keep it stable |
+| `SINGLE_USER_NAME` | `Local user` | `display_name` and `username` |
+| `SINGLE_USER_GROUPS` | none | `groups`, so `ROLE_GROUPS` can grant it roles when `register_permissions` is in use |
+
+```python
+from greentechhub_fastapi.auth import single_user_identity
+from greentechhub_fastapi.notifications import notify
+
+single_user_identity(app)                           # the Identity, or None under another adapter
+await notify(app, None, toast("Scan finished"))     # None: the single user, from code with no request
+```
+
+- The identity has `provider="single_user"`, no email and `claims={}`. It isn't run through `register_users`'
+  account resolution, so its subject never changes.
+- `bearer=` is ignored, and there's nothing to sign in to: don't mount `LoginViews`.
+- **There is no authentication.** Anyone who can reach the app is that person, and `register_auth` logs a warning
+  saying so. Bind the app to `127.0.0.1` (or otherwise make sure only its user can reach it).
 
 ## User accounts
 
