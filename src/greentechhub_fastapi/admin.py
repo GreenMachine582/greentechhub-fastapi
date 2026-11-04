@@ -22,7 +22,7 @@ class AdminView(Protocol):
     url: str
     title: str
     icon: str
-    permission: str
+    permission: str | None  # None: any signed-in identity
 
     def router(self) -> APIRouter: ...
 
@@ -36,7 +36,7 @@ def admin_nav_item(
         "icon": icon,
         "children": [
             {"label": view.title, "url": view.url, "icon": view.icon,
-             "required_permission": view.permission}
+             **({"required_permission": view.permission} if view.permission else {})}
             for view in views
         ],
     }

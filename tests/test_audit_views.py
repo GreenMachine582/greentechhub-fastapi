@@ -121,3 +121,34 @@ def test_unreadable_dates_and_cursors_are_ignored(audit_settings, store, tmp_pat
     app = _app(audit_settings, store, tmp_path)
     page = _get(app, "/admin/audit?on_or_before=soon&before=yesterday", subject="root")
     assert page.status_code == 200 and len(_rows(page)) == 5
+
+
+# permission=None: an activity page any signed-in identity can open
+
+
+def _open_app(settings, store, tmp_path):
+    (tmp_path / "audit_page.html").write_text(PAGE, encoding="utf-8")
+    views = AuditViews(templates=Jinja2Templates(directory=tmp_path), permission=None)
+    app = build_app(settings)  # no register_permissions
+    register_audit(app, settings, store=store, views=views)
+    return app
+
+
+def test_without_a_permission_any_signed_in_identity_sees_the_log(audit_settings, store,
+                                                                     tmp_path):
+    app = _open_app(audit_settings, store, tmp_path)
+    response = _get(app, "/admin/audit", subject="bob")
+    assert response.status_code == 200 and len(_rows(response)) == 5
+
+
+def test_without_a_permission_anonymous_still_goes_to_login(audit_settings, store, tmp_path):
+    response = _get(_open_app(audit_settings, store, tmp_path), "/admin/audit")
+    assert response.status_code == 303 and response.headers["location"] == "/login"
+
+
+def test_with_no_permission_the_admin_nav_item_is_unrestricted(tmp_path):
+    from greentechhub_fastapi.admin import admin_nav_item
+
+    views = AuditViews(templates=Jinja2Templates(directory=tmp_path), permission=None)
+    child = admin_nav_item([views])["children"][0]
+    assert child == {"label": "Audit log", "url": "/admin/audit", "icon": "journal-text"}

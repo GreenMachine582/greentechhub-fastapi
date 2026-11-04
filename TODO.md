@@ -33,8 +33,6 @@ here through `register_users` and the store-backed views in `greentechhub_fastap
 
 ### Local single-user apps
 For a local tool with one user and no sign-in that scans folders and runs long jobs.
-- [ ] `AuditViews(permission=None)` for an activity page without a permission gate, and `record_audit` for code
-  with no request
 - [ ] `register_jobs` and `JobViews` over core's `JobRunner`: progress polling, pause/resume/cancel, the result,
   an audit entry (and optionally a notification) when a job finishes
 - [ ] `FolderPickerViews` over core's folder listing, for greentechhub-ui's folder picker

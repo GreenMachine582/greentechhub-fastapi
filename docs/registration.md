@@ -451,6 +451,8 @@ await audit(request, "stock.archived", target=("stock", stock.id), summary=f"Arc
   for the system (a scheduled sync). Core scrubs credential-like keys out of `details`. Before `register_audit` it
   does nothing and returns `None`. A store that fails is logged and `None` returned, never raised: the action has
   already happened.
+- `record_audit(app, action, *, actor=None, target=None, summary="", details=None)` is the same for code with no
+  request (a background job): the actor is whoever you pass, `None` for the system.
 - **Recorded by this package:**
   - `auth.signed_in`, `auth.sign_in_failed` and `auth.locked_out` (`LoginViews`). `locked_out` is both the failure
     that trips the throttle and each attempt refused while it holds. A failed attempt's details hold the user ID
@@ -463,12 +465,24 @@ await audit(request, "stock.archived", target=("stock", stock.id), summary=f"Arc
 
 | Route | Does |
 |---|---|
-| `GET /admin/audit` | newest first, `page_size` (50) at a time. Filters: `actor`, `action` (exact, or a prefix ending in `.`), `on_or_before` (a date). `before` is the paging cursor. Anonymous → login redirect, without `permission` → 403 |
+| `GET /admin/audit` | newest first, `page_size` (50) at a time. Filters: `actor`, `action` (exact, or a prefix ending in `.`), `on_or_before` (a date). `before` is the paging cursor. Anonymous → login redirect, without `permission` → 403 (no check when `permission=None`) |
 
 **Templates.** It defaults to greentechhub-ui's `audit_page.html`; set `page_template` to use your own. It gets
 `page_title`, `audit_url`, `audit_filters` (`actor`, `action`, `on_or_before`), `audit_entries` (each `at`, `actor`,
 `action`, `target` as `"type:id"` or `None`, `summary`, `details`) and `audit_next_url` (the older page, keeping the
 filters, or `None`). An unreadable date or cursor is ignored, not refused.
+
+**An activity page.** `AuditViews(templates=templates, permission=None)` drops the permission gate: any signed-in
+identity sees the log, and `register_permissions` isn't needed. With
+[`AUTH_ADAPTER=single_user`](auth.md#single-user-mode-no-sign-in) that's an activity page with no sign-in at all.
+For a feed rather than a table, use greentechhub-ui's timeline template; with `permission=None` the page has no
+`required_permission` in `register_admin`'s nav group either:
+
+```python
+activity = AuditViews(templates=templates, permission=None)
+activity.url, activity.title, activity.page_template = "/activity", "Activity", "activity_page.html"
+register_audit(app, settings, store=store, views=activity)
+```
 
 
 ## Admin
