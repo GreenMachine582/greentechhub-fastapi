@@ -12,15 +12,12 @@ from conventional commits; the same notes are published as
 
 * **audit:** AuditViews without a permission gate ([#102](https://github.com/GreenMachine582/greentechhub-fastapi/issues/102)) ([f23d9f4](https://github.com/GreenMachine582/greentechhub-fastapi/commit/f23d9f43d9f8e97b818298e5e2faf171c39123d0))
 * **auth:** single-user mode (AUTH_ADAPTER=single_user) ([#101](https://github.com/GreenMachine582/greentechhub-fastapi/issues/101)) ([b71e7bd](https://github.com/GreenMachine582/greentechhub-fastapi/commit/b71e7bd57f094a8306bef2b86d589d07947fe398))
-* **files:** FolderPickerViews ([328ac3e](https://github.com/GreenMachine582/greentechhub-fastapi/commit/328ac3e4a1638c14bf8ef60d38ade0a9194e60a8))
 * **files:** FolderPickerViews ([9383767](https://github.com/GreenMachine582/greentechhub-fastapi/commit/938376736ec465600c15949f8363cf4f57cc2444))
-* **jobs:** register_jobs and JobViews ([7ebdae6](https://github.com/GreenMachine582/greentechhub-fastapi/commit/7ebdae60d1c05b7b8040370c71aa01dbdf6ce5b0))
 * **jobs:** register_jobs and JobViews ([91d98fc](https://github.com/GreenMachine582/greentechhub-fastapi/commit/91d98fcb90267e2b0e393161237b7defa0e3bc7b))
 
 
 ### Build
 
-* **deps:** greentechhub-core v0.17.0 ([62dbd78](https://github.com/GreenMachine582/greentechhub-fastapi/commit/62dbd78855ca50a9aa3f14003af014fb59f84eae))
 * **deps:** greentechhub-core v0.17.0 ([d294fce](https://github.com/GreenMachine582/greentechhub-fastapi/commit/d294fce44f887dd831b0fe685f9f20c2becb50b4))
 
 ## [0.18.0](https://github.com/GreenMachine582/greentechhub-fastapi/compare/v0.17.0...v0.18.0) (2026-10-20)
