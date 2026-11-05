@@ -1,0 +1,45 @@
+# PRs are merged with a merge commit, so every commit in a PR reaches dev, then
+# main, and release-please reads each one for the changelog. Each commit has to
+# be a conventional commit. Merge commits are skipped, so merging the base
+# branch into a PR is fine. There's no branch filter, so chained PRs (based on
+# another feature branch) are checked too. See CONTRIBUTING.md.
+name: commits
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Every commit is a conventional commit
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          re='^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\([^)]+\))?!?: .+'
+          bad=0
+          while IFS= read -r line; do
+            sha="${line%% *}"
+            subject="${line#* }"
+            if ! [[ "$subject" =~ $re ]]; then
+              echo "::error::$sha is not a conventional commit: $subject"
+              bad=1
+            elif [ "${#subject}" -gt 100 ]; then
+              echo "::error::$sha first line is over 100 characters: $subject"
+              bad=1
+            else
+              echo "ok $sha $subject"
+            fi
+          done < <(git log --no-merges --format='%h %s' "origin/$BASE..$HEAD_SHA")
+          if [ "$bad" -ne 0 ]; then
+            echo "Reword those commits and push with --force-with-lease. See CONTRIBUTING.md#pull-requests."
+          fi
+          exit "$bad"
