@@ -26,8 +26,11 @@ feat/x ──commits──▶ PR to dev (merge commit) ──▶ branch deleted 
   first line of at most 100 characters, checked by `commits`. Each `feat`, `fix`, `perf` and `build` commit becomes
   a changelog line. `docs`, `test`, `refactor`, `ci` and `chore` stay out of it. For a breaking change use
   `feat!: …` plus a `BREAKING CHANGE:` footer in that commit's body.
-- The PR title is free text. The merge commit is GitHub's `Merge pull request #N from …`, which release-please
-  skips.
+- The PR title is free text and must **not** be a conventional commit (`commits` rejects one). The merge commit is
+  GitHub's `Merge pull request #N from …` with the PR title as its body, and release-please reads conventional
+  lines in a body as extra changes: a `feat(x): …` title would list that change twice. GitHub suggests a
+  one-commit PR's subject as its title, so rewrite it, e.g. `Folder picker views`. Release PRs to main use
+  `release: …`, which isn't a changelog type.
 - Update an open PR by adding commits, or by merging dev into it (the **Update branch** button). Don't rebase or
   force-push a PR that's been reviewed or that another PR is chained on. The one exception: rewording a commit
   `commits` rejected, before review, then `git push --force-with-lease`.
