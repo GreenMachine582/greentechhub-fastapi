@@ -10,6 +10,7 @@ from greentechhub_fastapi.registration.error_pages import register_error_pages
 from greentechhub_fastapi.registration.events import register_events
 from greentechhub_fastapi.registration.flash import register_flash
 from greentechhub_fastapi.registration.health import register_health
+from greentechhub_fastapi.registration.jobs import register_jobs
 from greentechhub_fastapi.registration.logging import register_logging
 from greentechhub_fastapi.registration.notifications import register_notifications
 from greentechhub_fastapi.registration.permissions import register_permissions
@@ -30,6 +31,7 @@ __all__ = [
     "register_events",
     "register_flash",
     "register_health",
+    "register_jobs",
     "register_logging",
     "register_notifications",
     "register_permissions",

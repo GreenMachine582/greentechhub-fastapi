@@ -392,7 +392,8 @@ await notify(app, user, toast("Sync finished", kind="success"), category="sync")
 ```
 
 - `notify(app, recipient, payload, *, category="general")` takes an `Identity` or a bare subject (for a job with no
-  `Identity`) and a greentechhub-ui `toast()` payload: what `toast()` returns (its `HX-Trigger` JSON text), that
+  `Identity`), or `None` for the app's one user under [`AUTH_ADAPTER=single_user`](auth.md#single-user-mode-no-sign-in)
+  (`ValueError` under any other adapter), and a greentechhub-ui `toast()` payload: what `toast()` returns (its `HX-Trigger` JSON text), that
   value decoded (`{"showToast": ...}`), or just its detail dict. It stores the notice and returns it.
 - **Delivery preferences:** register core's `notification_preferences({"sync": "Sync results"})` settings through
   `register_settings` and each person picks, per category, in the app, by email, both or off, on the settings page.
@@ -405,6 +406,8 @@ await notify(app, user, toast("Sync finished", kind="success"), category="sync")
   `notify` returns the stored notification, or `None` when it wasn't stored (email only, or off).
 - Read notifications pile up: call `store.prune(before)` now and then (e.g. from a scheduled job). Unread ones are
   never pruned.
+
+With `AUTH_ADAPTER=single_user` there's no sign-in: every route below acts for the single user.
 
 | Route | Does |
 |---|---|
@@ -448,6 +451,8 @@ await audit(request, "stock.archived", target=("stock", stock.id), summary=f"Arc
   for the system (a scheduled sync). Core scrubs credential-like keys out of `details`. Before `register_audit` it
   does nothing and returns `None`. A store that fails is logged and `None` returned, never raised: the action has
   already happened.
+- `record_audit(app, action, *, actor=None, target=None, summary="", details=None)` is the same for code with no
+  request (a background job): the actor is whoever you pass, `None` for the system.
 - **Recorded by this package:**
   - `auth.signed_in`, `auth.sign_in_failed` and `auth.locked_out` (`LoginViews`). `locked_out` is both the failure
     that trips the throttle and each attempt refused while it holds. A failed attempt's details hold the user ID
@@ -460,13 +465,80 @@ await audit(request, "stock.archived", target=("stock", stock.id), summary=f"Arc
 
 | Route | Does |
 |---|---|
-| `GET /admin/audit` | newest first, `page_size` (50) at a time. Filters: `actor`, `action` (exact, or a prefix ending in `.`), `on_or_before` (a date). `before` is the paging cursor. Anonymous → login redirect, without `permission` → 403 |
+| `GET /admin/audit` | newest first, `page_size` (50) at a time. Filters: `actor`, `action` (exact, or a prefix ending in `.`), `on_or_before` (a date). `before` is the paging cursor. Anonymous → login redirect, without `permission` → 403 (no check when `permission=None`) |
 
 **Templates.** It defaults to greentechhub-ui's `audit_page.html`; set `page_template` to use your own. It gets
 `page_title`, `audit_url`, `audit_filters` (`actor`, `action`, `on_or_before`), `audit_entries` (each `at`, `actor`,
 `action`, `target` as `"type:id"` or `None`, `summary`, `details`) and `audit_next_url` (the older page, keeping the
 filters, or `None`). An unreadable date or cursor is ignored, not refused.
 
+**An activity page.** `AuditViews(templates=templates, permission=None)` drops the permission gate: any signed-in
+identity sees the log, and `register_permissions` isn't needed. With
+[`AUTH_ADAPTER=single_user`](auth.md#single-user-mode-no-sign-in) that's an activity page with no sign-in at all.
+For a feed rather than a table, use greentechhub-ui's timeline template; with `permission=None` the page has no
+`required_permission` in `register_admin`'s nav group either:
+
+```python
+activity = AuditViews(templates=templates, permission=None)
+activity.url, activity.title, activity.page_template = "/activity", "Activity", "activity_page.html"
+register_audit(app, settings, store=store, views=activity)
+```
+
+
+## Jobs
+
+`register_jobs(app, settings, views=...)` puts a greentechhub-core `JobRunner` on the app: background jobs (a folder
+scan, an import, a library build) with progress, cooperative pause/resume/cancel and a result. `JobViews` serves the
+status partial greentechhub-ui's `gth_job_status` renders, which polls itself until the job ends.
+
+```python
+from greentechhub_core.background import JobContext
+from greentechhub_fastapi import register_jobs
+from greentechhub_fastapi.jobs import JobViews, get_job_runner
+
+job_views = JobViews(templates=templates)
+register_jobs(app, settings, views=job_views, notify=True)
+
+def scan(ctx: JobContext) -> dict:                  # a plain function runs in a worker thread
+    files = list(folder.rglob("*.mp3"))
+    for n, path in enumerate(files, 1):
+        ctx.checkpoint_sync()                       # pause and cancel take effect here
+        index(path)
+        ctx.progress(n, len(files), message=path.name)
+    return {"files": len(files), "badges": [[f"{len(files)} files", "good"]]}
+
+@app.post("/scan")
+async def start_scan(request: Request, user: Identity = Depends(require_page_identity())):
+    job = await get_job_runner(request).start("scan", scan, label="Scan music",
+                                              owner=user.subject, unique=True)
+    return job_views.status_response(request, job)  # the partial: it polls from here on
+```
+
+- `register_jobs(app, settings, *, store=None, views=None, audit=True, notify=False, event_bus=None, lock=None)`
+  returns the runner. `store` defaults to core's `InMemoryJobStore`. On shutdown the jobs still running are
+  cancelled. `lock` (e.g. a `FileLock` in `settings.lock_directory()`) makes `unique=True` hold across processes.
+  Core's [jobs docs](https://github.com/GreenMachine582/greentechhub-core/blob/dev/docs/modules.md#jobs) cover
+  `JobRunner` and `JobContext`.
+- **When a job ends:** with `audit` it's recorded as `jobs.succeeded`, `jobs.failed` or `jobs.cancelled` (actor: the
+  job's owner; target `("job", id)`; details: its kind, counts and error), once [`register_audit`](#audit-log) ran.
+  With `notify=True` its owner gets a notification in the `jobs` category ("Scan music finished", or "failed: …");
+  that needs [`register_notifications`](#notifications), and a job with no owner notifies nobody.
+- `get_job_runner(request)` is the runner, for a route's `Depends`. `job_dict(job)` is a `Job` as template data.
+
+| Route | Does |
+|---|---|
+| `GET /jobs` | recent jobs, newest first (`page_size`, 50) |
+| `GET /jobs/{id}` | the job's status partial; once it's finished, an htmx request gets status 286, which stops the polling |
+| `POST /jobs/{id}/pause`, `/resume`, `/cancel` | do that, then answer the status partial |
+
+Every route needs a signed-in identity (with [`AUTH_ADAPTER=single_user`](auth.md#single-user-mode-no-sign-in), no
+sign-in at all), and `permission` when one is given. With `owner_only` (the default) a person sees and controls
+their own jobs and the system's (owner `None`); anyone else's job is a 404.
+
+**Templates.** They default to greentechhub-ui's `job_status.html` and `jobs_page.html`; set `status_template` /
+`page_template` to use your own. The partial gets `job` (a `job_dict`: its fields, `state` as a string, `active`,
+`fraction`, `percent`), `poll_url` (`None` once finished), `pause_url`, `resume_url`, `cancel_url` and `poll_every`
+(`"1s"`). The page gets `page_title`, `jobs` (each a `job_dict` plus `status_url`) and `jobs_url`.
 
 ## Admin
 

@@ -3,6 +3,7 @@ from greentechhub_fastapi.auth.dependency import get_current_user
 from greentechhub_fastapi.auth.register import RegisterViews, RegistrationError
 from greentechhub_fastapi.auth.reset import PasswordResetViews
 from greentechhub_fastapi.auth.resolve import resolve_dependency
+from greentechhub_fastapi.auth.single_user import single_user_identity
 from greentechhub_fastapi.auth.throttle import LoginLockedOut, client_address, throttled_login
 from greentechhub_fastapi.auth.tokens import bearer_scheme, issue_token
 from greentechhub_fastapi.auth.verify import EmailVerificationViews
@@ -22,5 +23,6 @@ __all__ = [
     "get_current_user",
     "issue_token",
     "resolve_dependency",
+    "single_user_identity",
     "throttled_login",
 ]

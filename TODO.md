@@ -31,6 +31,12 @@ here through `register_users` and the store-backed views in `greentechhub_fastap
 - [ ] `AUTH_ADAPTER=oidc`: authorization code + PKCE against Authentik's discovery URL, for services not behind the
   outpost. It resolves through the same `resolve_account` with `provider="oidc:<name>"`
 
+### Local single-user apps
+For a local tool with one user and no sign-in that scans folders and runs long jobs.
+- [ ] Hosted apps (later): when the files live on the user's machine and not the server's, the server can't touch
+  them. It sends a plan of file operations and receives progress back, and greentechhub-ui's client-side executor
+  (File System Access handles, Chromium only) runs it. See greentechhub-ui's TODO
+
 ### M6 PyFinBot ready — shipped
 This package's share shipped in v0.17.0 (see the CHANGELOG): `register_csp`, `register_admin`, personal API tokens,
 `register_error_pages`, `get_owned_or_404` and `require_cookie_csrf`. PyFinBot's `todo.md` holds the adoption PRs.
@@ -72,10 +78,12 @@ one `register_*` call. Who wants it is noted where known.
 Its open items are under M3 above.
 
 ### PyFinBot
-It runs on this package throughout: auth (bearer and personal API tokens included), settings, permissions, roles and
-the Admin nav, audit, CSRF (pages and cookie-authenticated API calls), CSP, error pages, logging, health, API error
-handlers, query paging, login throttling and the test fixtures. What's left is adopting each release's new pieces, a
-PR each in PyFinBot's `todo.md`.
+It runs on this package (v0.18) throughout: auth (bearer and personal API tokens included), user accounts
+(`register_users`) and SCIM, settings, permissions, roles and the Admin nav, audit, CSRF (pages and
+cookie-authenticated API calls), CSP, error pages, logging, health, API error handlers, query paging and the lenient
+query parsers, `get_owned_or_404` (with `options=`), `uploads.read_upload`, login throttling and the test fixtures
+(PyFinBot #114, #115, #117, #118). What's left is adopting each release's new pieces, a PR each in PyFinBot's
+`todo.md`.
 
 ### Market Watch (planned)
 - [ ] Not started — builds on this from day one, same as PyFinBot
