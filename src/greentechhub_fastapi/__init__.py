@@ -58,6 +58,9 @@ greentechhub_fastapi.auth.csrf.
 register_audit likewise; audit, get_audit_store and AuditViews live in
 greentechhub_fastapi.audit.
 
+register_jobs likewise; get_job_runner, JobViews and job_dict live in
+greentechhub_fastapi.jobs.
+
 register_api_tokens likewise; ApiTokenViews, get_api_token_store and
 resolve_api_token live in greentechhub_fastapi.api_tokens.
 
@@ -88,6 +91,7 @@ from greentechhub_fastapi.registration import (
     register_events,
     register_flash,
     register_health,
+    register_jobs,
     register_logging,
     register_notifications,
     register_permissions,
@@ -111,6 +115,7 @@ __all__ = [
     "register_exception_handlers",
     "register_flash",
     "register_health",
+    "register_jobs",
     "register_logging",
     "register_notifications",
     "register_permissions",
