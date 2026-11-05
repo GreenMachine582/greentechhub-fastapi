@@ -104,6 +104,8 @@ app.include_router(folders.router())
   process can read.** That's fine for a local single-user app
   ([`AUTH_ADAPTER=single_user`](auth.md#single-user-mode-no-sign-in) on localhost), not for a shared server: there,
   pass `roots`, which `..`, symlinks and junctions can't escape.
+- It lists the **server's** folders: the user's own only while the app runs on their machine. For a hosted app the
+  files on the user's machine are out of the server's reach; see the TODO's "Hosted apps" entry.
 - The picker only reads folder names. The chosen path still arrives in your form as plain text, so validate it on
   submit (for example with `list_folders(path, roots=...)` and its `error`).
 
