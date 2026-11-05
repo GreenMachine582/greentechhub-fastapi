@@ -27,6 +27,7 @@ The FastAPI/Starlette-specific adapter package: turns `greentechhub-core`'s fram
 | `exception_handlers` | Registers handlers translating `greentechhub-core`'s exception types into the shared JSON error envelope (API routes) or an HTML error page (web routes); `register_api_error_handlers` gives FastAPI's own errors under an API prefix the same envelope | [docs/exceptions.md](docs/exceptions.md) |
 | `flash` | Cookie/session-based one-time messages, producing `greentechhub-core`'s `FlashMessage` type | [docs/modules.md](docs/modules.md) |
 | `events` | Startup/shutdown hooks wiring `greentechhub-core`'s event publisher into the FastAPI app lifecycle | [docs/modules.md](docs/modules.md) |
+| `folders` | `FolderPickerViews`: the browse endpoint behind greentechhub-ui's `gth_folder_picker`, over `greentechhub-core`'s `list_folders` (drive roots, hidden folders, permission errors as messages, optional roots) | [docs/modules.md](docs/modules.md#folder-picker) |
 | `dependencies` | Small `Depends`-ready helpers beyond auth (current identity, feature-flag lookups, pagination params) | [docs/modules.md](docs/modules.md#dependencies) |
 
 ## 📚 Docs

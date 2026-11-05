@@ -33,7 +33,6 @@ here through `register_users` and the store-backed views in `greentechhub_fastap
 
 ### Local single-user apps
 For a local tool with one user and no sign-in that scans folders and runs long jobs.
-- [ ] `FolderPickerViews` over core's folder listing, for greentechhub-ui's folder picker
 - [ ] Hosted apps (later): when the files live on the user's machine and not the server's, the server can't touch
   them. It sends a plan of file operations and receives progress back, and greentechhub-ui's client-side executor
   (File System Access handles, Chromium only) runs it. See greentechhub-ui's TODO
