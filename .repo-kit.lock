@@ -1,0 +1,72 @@
+{
+  "files": {
+    ".github/workflows/pr-checks.yml": {
+      "layer": "common",
+      "mode": "managed",
+      "sha256": "d8acfa4f346b049cf6c68f7626dcb26aa431865e2230dfb652a4c484f9a90c25"
+    },
+    ".github/workflows/release.yml": {
+      "layer": "profiles/dev-main",
+      "mode": "managed",
+      "sha256": "8f0c8686a48b84a4d8cd9568488aabb195bbe7736e7cf9452f5c6992d263e13e"
+    },
+    ".github/workflows/update-prs-trigger.yml": {
+      "layer": "common",
+      "mode": "managed",
+      "sha256": "3a0fb729db67402f41c375a593815d4879d4a4e6930850a8b1a0256da6afcc34"
+    },
+    ".github/workflows/update-prs.yml": {
+      "layer": "common",
+      "mode": "managed",
+      "sha256": "4f20a1bd056d0e60cf15a1f1216e13377a02aaf926d8d4b667a6012f26fb9ae7"
+    },
+    ".gitignore": {
+      "blocks": {
+        "local": {
+          "layer": "common",
+          "sha256": "8d0100a55ad04be1ebf7eb3c9c57cd0acf255092e2ba13d3864bee5fa58b5171"
+        }
+      },
+      "mode": "block"
+    },
+    ".release-please-manifest.json": {
+      "layer": "profiles/dev-main",
+      "mode": "seeded",
+      "sha256": "027284a273bccba847533811e52cc1057182cd9c184ee91635422a6d6c2abdcc"
+    },
+    ".repo-kit.toml": {
+      "layer": "common",
+      "mode": "seeded",
+      "sha256": "243ca6aae5ed7a1ce506896449ece555dadcdd40d76eb9be261d80c1db63c4bc"
+    },
+    "CONTRIBUTING.md": {
+      "blocks": {
+        "branches": {
+          "layer": "profiles/dev-main",
+          "sha256": "733cd3ad5cb92f866178df6bb1b0d096f206d79473caee7d606ae26e1bc8f4aa"
+        },
+        "chained-prs": {
+          "layer": "profiles/dev-main",
+          "sha256": "d96c0d81f9495c3af8249626fa7e39b81b72c8bd8f3c64f9ef669268706a9d63"
+        },
+        "pull-requests": {
+          "layer": "profiles/dev-main",
+          "sha256": "d4c37a324ac2575b3477205f84f895daa20d71ec9dc2db3cc7d38b4c2c8eacb1"
+        },
+        "releasing": {
+          "layer": "profiles/dev-main",
+          "sha256": "a57b5893764cd4078d83a1f9c68d73b7fb4a6c837bf576a22c1ca7ef1c3b5c53"
+        }
+      },
+      "mode": "block"
+    },
+    "release-please-config.json": {
+      "layer": "profiles/dev-main",
+      "mode": "managed",
+      "sha256": "3b889468e72e7447571c9cb4ff5c508f71872cd27bcfe60584990b8198beb73c"
+    }
+  },
+  "ref_sha": "5910d0e79d430a93401fea500d0e57691ac1c47c",
+  "ref_sha_version": "0.4.0",
+  "version": "0.4.0"
+}
