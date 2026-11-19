@@ -2,69 +2,97 @@
 
 # Contributing
 
-## Branches
+<!-- >>> repo-kit: branches -->
+## 🔀 Branches
 
 ```
-feat/x ──commits──▶ PR to dev (merge commit) ──▶ branch deleted     release-please (on main)
-                                  dev ──PR (merge commit)──▶ main ──▶ release PR ──merge──▶ tag vX.Y.Z
-                                  dev ◀──────────────── back-merge ─────────────────────────┘
+feat/x ──commits──► draft PR to dev ──► ready ──► checks pass ──► merge commit ──► dev
+                                                                                    │
+           tag vX.Y.Z ◄── release PR merged ◄── dev → main PR ◄─────────────────────┘
+               │
+               └──► main merged back into dev
 ```
 
-- **`main`** only ever holds released code. Consumers pin tags (`…@vX.Y.Z`), never branches.
-- **`dev`** is the integration branch and the default branch: open PRs against it.
-- **Branches** are named `<type>/<short-description>` (`feat/folder-picker`, `docs/todo-jobs`), hold one topic and
-  live until their PR merges. GitHub then deletes the branch. Delete your local copy with `git branch -D`, or run
-  `scripts/prune-branches.sh` (see [Rules](#rules)).
+- **`dev`** is the default branch and the base for feature PRs.
+- **`main`** only holds released code, and only takes release PRs from `dev`. Consumers pin tags (`…@vX.Y.Z`),
+  never branches.
+- Neither takes a direct push: every change goes through a PR, merged with a **merge commit**.
+- Branches are named `<type>/<short-description>` (`feat/folder-picker`, `docs/adoption`), using the commit types
+  below. Each holds one topic and lives until its PR merges.
+- One branch is one worktree: `rk wt start <branch>` creates both and sets the worktree up. When the PR has merged,
+  `rk wt done <branch>` removes them.
+<!-- <<< repo-kit: branches -->
 
-## Pull requests
+<!-- >>> repo-kit: pull-requests -->
+## 📬 Pull requests
 
-- A PR to dev is one topic, made of related commits. For example `feat(jobs): JobViews`, then
-  `test(jobs): pause and resume`, then `docs(jobs): JobViews reference`. Code and the docs that describe it go in the
-  same PR.
-- PRs are merged with a **merge commit**, so every commit lands on dev as written and release-please reads each
-  one. That means **every commit** must be a [conventional commit](https://www.conventionalcommits.org/) with a
-  first line of at most 100 characters, checked by `commits`. Each `feat`, `fix`, `perf` and `build` commit becomes
-  a changelog line. `docs`, `test`, `refactor`, `ci` and `chore` stay out of it. For a breaking change use
-  `feat!: …` plus a `BREAKING CHANGE:` footer in that commit's body.
-- The PR title is free text and must **not** be a conventional commit (`commits` rejects one). The merge commit is
-  GitHub's `Merge pull request #N from …` with the PR title as its body, and release-please reads conventional
-  lines in a body as extra changes: a `feat(x): …` title would list that change twice. GitHub suggests a
-  one-commit PR's subject as its title, so rewrite it, e.g. `Folder picker views`. Release PRs to main use
-  `release: …`, which isn't a changelog type.
-- Update an open PR by adding commits, or by merging dev into it (the **Update branch** button). Don't rebase or
-  force-push a PR that's been reviewed or that another PR is chained on. The one exception: rewording a commit
-  `commits` rejected, before review, then `git push --force-with-lease`.
-- Required checks: `test` and `commits`. Approvals aren't required (solo maintainer, and GitHub doesn't count
-  self-approval).
+- A PR is one topic, made of related commits. Code and the docs that describe it go in the same PR.
+- Open it as a **draft**, and mark it ready when it's done. Only ready PRs are kept current by the PR bot, which
+  merges the base in when it moves. Add the `wip` label to a ready PR under rework.
+- Update an open PR by adding commits, or by merging its base in with `rk wt sync`. Never rebase or force-push:
+  others may have the branch, or have chained a PR on it.
 
-### Chained PRs
+### Commits
 
-Small PRs get reviewed and merged faster, and they conflict less. When one piece of work builds on another, chain them
-instead of opening one big PR:
+PRs are merged with a merge commit, so every commit lands on `dev` as written and release-please reads each one.
+**Every commit** must be a [Conventional Commit](https://www.conventionalcommits.org), with a first line of at most
+100 characters and a body that explains why. Merge commits are skipped by the `commits` check. `rk install --hooks` runs the same check on each
+commit, before it's made.
 
-1. `feat/a` → PR into `dev`.
-2. Branch `feat/b` off `feat/a` → PR with **base `feat/a`**. Its diff shows only B's commits, and `commits` and CI
+| Type | For | In the changelog |
+|---|---|---|
+| `feat` | New behaviour | Yes (minor bump) |
+| `fix` | Something that was broken | Yes (patch) |
+| `perf` | Faster or lighter, same behaviour | Yes (patch) |
+| `build` | Tooling and dependencies | Yes (patch) |
+| `docs` | Documentation only | No |
+| `refactor` | Restructuring with the same behaviour | No |
+| `test` | Tests only | No |
+| `ci` | GitHub Actions workflows | No |
+| `chore` | Housekeeping that changes no behaviour | No |
+| `style` | Formatting only | No |
+| `revert` | Undoing an earlier commit | Yes |
+
+A breaking change is `feat!:` (or any type with `!`), plus a `BREAKING CHANGE:` footer in that commit's body
+explaining what to change.
+
+### PR titles
+
+PR titles are **not** Conventional Commits: write a plain sentence, such as `Add the folder picker`. The merge commit carries the title, and release-please reads a conventional line there as one more change, so a `feat: …` title would list that change twice. GitHub suggests a one-commit PR's subject as its title, so rewrite it. Release PRs (`release: …`, `chore(main): release …`) are allowed.
+<!-- <<< repo-kit: pull-requests -->
+
+<!-- >>> repo-kit: chained-prs -->
+## 🔗 Several PRs at once
+
+Small PRs are reviewed faster and conflict less. When one piece of work builds on another, chain them instead of
+opening one big PR:
+
+1. `feat/a` → a PR into `dev`.
+2. `rk wt start feat/b --from feat/a` → a PR with **base `feat/a`**. Its diff shows only B's commits, and the checks
    run on it as usual.
-3. Merge A. GitHub deletes `feat/a` and retargets B's PR to `dev` by itself. B already contains A's real commits
+3. Merge A. GitHub deletes `feat/a` and retargets B's PR to `dev` by itself. B already holds A's commits
    (merge commits keep them), so nothing conflicts and nothing needs rebasing.
-4. Merge B, and so on down the chain. To pick up a fix made in A after B was branched, merge `feat/a` into `feat/b`.
+4. Merge B, and so on down the chain.
 
-Merge the chain in order, starting from the PR nearest dev. Merging B first lands A's commits along with it.
+Merge the chain in order, starting from the PR nearest `dev`: merging B first would land A's commits with
+it. To pick up a fix made in A after B was branched, merge `feat/a` into `feat/b`.
+<!-- <<< repo-kit: chained-prs -->
 
-## Releasing
+<!-- >>> repo-kit: releasing -->
+## 🚢 Releasing
 
-Release whenever dev is in a state worth shipping. There's no fixed cadence.
+Release whenever `dev` is worth shipping. There's no fixed cadence.
 
-1. Open a PR `dev` → `main` ("release: …"), wait for CI, merge (merge commit).
-2. release-please opens or updates **`chore(main): release X.Y.Z`** on `main`: the version bump
-   (`pyproject.toml`) and the new `CHANGELOG.md` section, computed from the commits. `feat` → minor, `fix` /
-   `perf` / `build` → patch (docs, refactor, tests, CI and chores alone never cut a release). While below 1.0,
-   a breaking change bumps the minor.
-3. Review the notes and merge it. It's opened by the `gth-release-bot` GitHub App, so CI runs on it. Merging tags
-   `vX.Y.Z`, publishes the [GitHub Release](../../releases) with the same notes, and merges `main` back into `dev`.
+1. Open a PR from `dev` to `main`, titled `release: …`. Wait for the checks, and merge it with a merge commit.
+2. release-please opens or updates **`chore(main): release X.Y.Z`** on `main`, with the version bump and the new
+   `CHANGELOG.md` section worked out from the commits. It's opened by the `gth-release-bot` GitHub App, so the
+   checks run on it.
+3. Review the notes and merge it. That tags `vX.Y.Z`, publishes the GitHub Release with the same notes, and merges
+   `main` back into `dev`.
 
-Never bump versions or edit released `CHANGELOG.md` sections by hand, and never move a `v*` tag (the tag ruleset
-blocks it).
+Never bump a version or edit a released `CHANGELOG.md` section by hand, and never move a `v*` tag: consumers pin
+exact tags.
+<!-- <<< repo-kit: releasing -->
 
 ## Developing against local GTH repos
 
