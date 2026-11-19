@@ -103,20 +103,18 @@ order: [greentechhub-core's CONTRIBUTING.md](https://github.com/GreenMachine582/
 
 ## Rules
 
-GitHub settings live in the repo and are applied with `scripts/apply-rulesets.sh`, which needs an authenticated
-`gh` with admin rights. Rerun it whenever one of these files changes:
+GitHub settings and rulesets come from [`.repo-kit.toml`](.repo-kit.toml), through
+[repo-kit](https://github.com/GreenMachine582/repo-kit/blob/main/docs/rulesets.md). `rk github diff` shows any drift,
+and `rk github apply` (an authenticated `gh` with admin rights, never in CI) applies it:
 
-| File | What it sets |
+| What | Sets |
 |---|---|
-| [`.github/repo-settings.json`](.github/repo-settings.json) | Merge commits only (no squash or rebase), delete the branch on merge, the **Update branch** button, auto-merge |
-| [`.github/rulesets/dev.json`](.github/rulesets/dev.json) | `dev`: PR with a merge commit, green required checks, no force-push or deletion |
-| [`.github/rulesets/main.json`](.github/rulesets/main.json) | `main`: the same, with `test` required |
-| [`.github/rulesets/tags.json`](.github/rulesets/tags.json) | `v*` tags can't be moved or deleted, and only release-please (the `gth-release-bot` app) creates them |
+| Repo settings | Default branch `dev`, merge commits only (no squash or rebase), delete the branch on merge, the **Update branch** button, auto-merge, immutable releases |
+| `repo-kit: dev` | A PR with a merge commit, green required checks, signed commits, no force-push or deletion |
+| `repo-kit: main` | The same, on `main` |
+| `repo-kit: tags` | `v*` tags can't be moved or deleted, and only `gth-release-bot` creates them |
 
 In an emergency the admin can merge a PR past failing checks (a logged bypass), but nobody, admin included, can push
 straight to `main` or `dev`. Use the bypass to fix a broken pipeline, not to skip one.
 
-`scripts/prune-branches.sh` cleans up branches after merges. It's a dry run by default, and `--apply` deletes. It
-removes local branches whose PR merged, and origin branches whose PR merged or was closed. It never touches `dev`,
-`main`, the checked-out branch, a branch with an open PR or no PR, or one with commits beyond what its PR merged
-(reported as `newer`, so check it by hand).
+`rk branches prune` cleans up branches after merges. It's a dry run by default, and `--apply` deletes.
